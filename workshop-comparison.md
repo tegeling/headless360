@@ -1,504 +1,210 @@
 # Headless360 Workshop — Approach Comparison
 
-Comparing approaches to running the same workshop prompts against a Salesforce org:
+Running the **same 15-prompt sales workflow** against one live Salesforce org, three ways, to see how the experience and results differ:
 
-- **Iteration 1 — Default Claude tools:** org access via the connected `sf` CLI (SOQL, `apex run`) through Bash. No MCP, no Salesforce-hosted servers.
-- **Iteration 2 — Standard Salesforce MCP server:** same prompts run through the Salesforce-provided server-side hosted (standard) MCP server(s).
+- **Iteration 1 — Default Claude tools:** org access via the connected `sf` CLI (SOQL, `apex run`) through Bash. No MCP. *(Assumes a developer workstation — see the [README](README.md) for why that matters.)*
+- **Iteration 2 — Standard Salesforce MCP server:** the same prompts run through the Salesforce-hosted `sobject-all` MCP server (schema, SOQL, aggregates).
+- **Custom MCP server (Prompts 14–15 only):** an org-built server exposing this org's own logic (Account Health Check, Sync Meeting) as callable tools.
 
-**Prompt scope:**
-- **Prompts 1–13** are compared across Iteration 1 (default tools) vs Iteration 2 (standard MCP).
-- **Prompts 14–15** are compared across three approaches: default tools, **standard MCP**, and a **custom MCP server** (org-specific tools, e.g. the Account Health Check). These prompts exercise the custom server-side logic in this repo (the `Account_Health_Check_Calculator` flow + `ActivityEngagementScore` / `OpportunityHealthScore` / `SupportSignalsScore` Apex).
+**Org:** `epic.ee57ef6782f0@orgfarm.salesforce.com`. Iteration 1 started 2026-07-01; Iteration 2 run 2026-07-02 (**blind** — no access to Iteration 1's findings during the prompts, for a fair comparison).
 
-**Org:** `epic.ee57ef6782f0@orgfarm.salesforce.com` (`https://orgfarm-47f6723093.my.salesforce.com`)
-**Date started:** 2026-07-01
+This document has two parts:
+- **Part A — Per-prompt comparison (side by side):** each prompt with both iterations next to each other + a verdict. *(This merges what was previously two files — the Iteration-1 log and `iteration-2-results.md`.)*
+- **Part B — Comparison summary:** the overall analysis, scorecard, scored dimensions, recommendations, the sales story, the MCP benefits, and the business-user POV.
 
-For each prompt I record: full response text, steps & tools used, and effort/accuracy notes.
+> The short, leadership-facing version lives in the **[README](README.md)**.
 
 ---
 
-## Iteration 1 — Default Claude tools (sf CLI)
+# Part A — Per-prompt comparison (side by side)
 
-_Prompts will be recorded below as they are executed, one section per prompt._
+_For each prompt: Iteration 1 (default `sf` CLI tools) vs. Iteration 2 (standard MCP). Prompts 14–15 also cover the custom MCP server. "Steps" counts tool calls. Both runs reached the same domain conclusions independently, using their own invented definitions where the prompt was open-ended — differences in numbers below are definitional, not correctness gaps._
 
-### Prompt 1
+### Prompt 1 — Most relevant objects & fields
 
-**Prompt:**
 > What Salesforce objects and fields are most relevant for understanding Sales Cloud activity in this org? Focus on Account, Lead, Opportunity, Campaign, CampaignMember, Task, and Contact.
 
-**Steps & tools used:**
-1. Bash: probe `sf sobject describe -s <obj>` for all 7 objects (field counts) to confirm describe access.
-2. Bash: `sf sobject describe -s <obj> --json` for each object, piped through a Python filter to extract relationships, dates, picklists, currency, key business flags, and custom fields.
+| | Iteration 1 — Default tools (`sf` CLI) | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | 2 calls: `sf sobject describe` (probe field counts) + a combined describe piped through Python to filter fields | 2 calls: `getObjectSchema` (object index) + `getObjectSchema` for the 7 objects |
+| **Result** | Field counts per object (Account 49, Lead 50, Opp 39, Campaign 33, CampaignMember 36, Task 39, Contact 66); themed field lists; surfaced 3 custom fields (`Partner_Tier__c`, `Quarterly_Quota__c`, `Partner_Referral__c`) | LLM-ready field lists with types + picklist values; same partner custom fields surfaced automatically; identified the partner/channel motion |
+| **Effort / notes** | Had to know the CLI describe command, write a filter to reduce hundreds of fields, and dump a huge polymorphic `WhatId` list; relevance judgment entirely manual | Low effort — schema tool returns relevance-shaped lists directly. One wrinkle: 132 KB payload truncated, needed a follow-up for Contact |
 
-Tools: `sf` CLI (`sobject describe`) via Bash + inline Python for filtering. No MCP.
+**Verdict:** *Slight edge — standard MCP.* Same picture (incl. the same custom fields), but the schema tool returns fields already shaped for relevance, so less manual filtering.
 
-**Full response:**
-Answer grounded in the org's live schema. Field counts per object: Account 49, Lead 50, Opportunity 39, Campaign 33, CampaignMember 36, Task 39, Contact 66.
+### Prompt 2 — Key fields by theme
 
-- **Account:** Type, Industry, AnnualRevenue, AccountSource, OwnerId; ParentId (hierarchy); LastActivityDate; custom: `Partner_Tier__c`, `Quarterly_Quota__c`.
-- **Lead:** Status, Rating, LeadSource, Industry, AnnualRevenue; conversion set IsConverted/ConvertedDate/ConvertedAccountId/ConvertedContactId/ConvertedOpportunityId; LastActivityDate; custom: `Partner_Referral__c`.
-- **Opportunity:** StageName, Amount, CloseDate, Type, ForecastCategory, LeadSource; IsClosed/IsWon; AccountId/ContactId/CampaignId/OwnerId; LastStageChangeDate, LastActivityDate; custom: `Partner_Account__c`.
-- **Campaign:** Type, Status, IsActive, StartDate/EndDate, ParentId; BudgetedCost/ActualCost/ExpectedRevenue; rollups AmountAllOpportunities/AmountWonOpportunities.
-- **CampaignMember:** CampaignId/LeadId/ContactId/LeadOrContactId; Status, FirstRespondedDate, LeadSource.
-- **Task:** ActivityDate, Status, Priority, TaskSubtype, CallType, CompletedDateTime, IsClosed; polymorphic WhoId (Contact/Lead), WhatId (Account/Opportunity/Case/…), AccountId; recurrence fields.
-- **Contact:** AccountId, ReportsToId, OwnerId; Email/Phone/EmailBouncedDate; LeadSource/ContactSource; LastActivityDate.
-- Relationship graph + note that LastActivityDate is the rolled-up activity heartbeat and Task/Event hold raw touches. (Full prose delivered to user.)
-
-**Effort & accuracy notes:**
-- Steps: 2 Bash calls (1 probe + 1 combined describe/extract).
-- Data source: live org schema via `sf sobject describe`.
-- Correct / complete: Reflects actual org, including 3 custom fields that a generic answer would miss. Standard-object field lists filtered heuristically (not exhaustive).
-- Friction: Required knowing the CLI describe command and writing a filter to reduce hundreds of fields to the relevant subset; `WhatId` polymorphic target list is very large and dumped verbatim. No semantic "relevance" ranking from the tool itself — relevance judgment was mine.
-
-### Prompt 2
-
-**Prompt:**
 > Describe the key fields on Account, Lead, Opportunity, Campaign, CampaignMember, and Task. Call out fields that help explain partner attribution, pipeline health, campaign follow-up, or sales activity.
 
-**Steps & tools used:**
-1. Bash: single Python script calling `sf sobject describe -s <obj> --json` for the 6 objects, extracting active picklist values for the theme-relevant fields (StageName, ForecastCategoryName, Type, Status, Rating, Priority, TaskSubtype). Reused schema knowledge from Prompt 1 for the rest.
+| | Iteration 1 — Default tools | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | 1 call: Python pulling live picklist values for theme-relevant fields; reused P1 schema | 0 new calls — reused the P1 schema detail |
+| **Result** | Four themed groups with live picklist values (e.g. Campaign Type includes `Partners`/`Referral Program`); partner fields form a referral→tier→deal-credit chain | Same four themes mapped to concrete fields; three of four themes lean on custom fields |
+| **Effort / notes** | Needed to know which fields carry picklists worth pulling; theme grouping is analytical | Zero extra calls — one describe answered both "what fields exist" and "which serve which question" |
 
-Tools: `sf` CLI (`sobject describe`) via Bash + inline Python. No MCP.
+**Verdict:** *Standard MCP.* One schema call served both prompts; Iteration 1 still needed a query for picklists.
 
-**Full response:**
-Organized field lists into 4 themes, with live picklist values:
+### Prompt 3 — Accounts sample by state/industry/type/employees
 
-- **Partner attribution:** Account.`Partner_Tier__c` (custom), Account.`Type` (Partner/Reseller/Integrator), Lead.`Partner_Referral__c` (custom →Account), Lead.`LeadSource`, Opportunity.`Partner_Account__c` (custom →Account), Campaign.`Type` = Partners/Referral Program. Noted the 3 custom fields form a referral→tier→deal-credit chain.
-- **Pipeline health:** Opportunity.`StageName` (10 stages: Prospecting…Closed Won/Lost), `ForecastCategoryName` (Omitted/Pipeline/Best Case/Commit/Closed), `Amount`, `CloseDate`, `IsClosed`/`IsWon`, `Type` (Existing/New Business), `LastStageChangeDate` (stall detector), Account.`Quarterly_Quota__c` (custom). Called out LastStageChangeDate+StageName as best stall signal.
-- **Campaign follow-up:** CampaignMember.`Status` (Sent/Responded), `FirstRespondedDate`, Campaign.`Status`/`IsActive`/`StartDate`/`EndDate`, Campaign rollups `AmountAllOpportunities`/`AmountWonOpportunities`, Opportunity.`CampaignId`. Noted Responded + no subsequent Task = missed follow-up.
-- **Sales activity:** Task.`TaskSubtype` (Task/Email/Call/Cadence/LinkedIn/List Email), `Status`, `Priority`, `ActivityDate`/`CompletedDateTime`, `WhoId`/`WhatId`/`AccountId`; `LastActivityDate` rollup on Account/Lead/Contact/Opportunity as the going-cold heartbeat.
-
-(Full themed tables delivered to user.)
-
-**Effort & accuracy notes:**
-- Steps: 1 Bash call (picklist extraction); leveraged Prompt 1's schema so no re-describe of full field lists.
-- Data source: live org schema + live picklist values via `sf sobject describe`.
-- Correct / complete: Picklist values are the org's actual configured values (e.g., Campaign Type includes `Partners`/`Referral Program`, TaskSubtype includes `Cadence`/`LinkedIn`), which materially sharpen the theme analysis. Custom partner fields correctly surfaced.
-- Friction: Theme grouping and the interpretive call-outs (stall detector, missed-follow-up heuristic) are my analysis, not tool output. Needed to know which fields carry picklists worth pulling.
-
-### Prompt 3
-
-**Prompt:**
 > Show me a sample of Accounts by state, industry, type, and employee count.
 
-**Steps & tools used:**
-1. Bash: `sf data query -q "SELECT Name, BillingState, Industry, Type, NumberOfEmployees FROM Account ORDER BY Name LIMIT 30" --json`, formatted into a table via inline Python.
+| | Iteration 1 — Default tools | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | 1 query, `LIMIT 30`; distribution eyeballed | 3 queries incl. `GROUP BY` for state and industry×type |
+| **Result** | Returned 30 rows and **mistook them for the whole org**; approximate distribution | True distribution over **all 152 accounts** (NV 33, CA 30, CO 22…); partner ~10% |
+| **Effort / notes** | Mapped NL field names to API names; `LIMIT 30` masqueraded as "full org" — corrected two prompts later | `GROUP BY` did the counting server-side; self-consistent (sums to 152) |
 
-Tools: `sf` CLI (`data query` / SOQL) via Bash. No MCP.
+**Verdict:** *Standard MCP.* Server-side aggregation gave a more accurate first answer; the default run undercounted the org.
 
-**Full response:**
-Returned all 30 Accounts (org totalSize = 30, so the "sample" is the full set). Table of Name/BillingState/Industry/Type/NumberOfEmployees delivered. Added distribution notes:
-- States: CO 7, NV 5, CA 5, WA 4, UT 3, NM 3, OR 2, ID 1 (all US West/Mountain).
-- Type: Customer ~18, Prospect ~7, Partner 4 (partners align with partner-attribution theme).
-- Industry: Transportation most common; then Education/Healthcare/Retail/Hospitality/Manufacturing/Consulting.
-- Employees: repeated values (45/80/125/220/450/800/1200/2500) → synthetic demo data.
+### Prompt 4 — Nevada priority accounts
 
-**Effort & accuracy notes:**
-- Steps: 1 Bash call.
-- Data source: live Account records via SOQL.
-- Correct / complete: Full population returned (30 rows). Had to choose `BillingState` for "state" (Account has no plain State field) and `NumberOfEmployees` for "employee count" — reasonable field mapping. Distribution counts are approximate (eyeballed, not aggregated with GROUP BY).
-- Friction: Needed to map natural-language field names to API names. LIMIT 30 happened to cover the whole org; on a larger org this would be a partial sample requiring GROUP BY / aggregate queries for real distribution.
-
-### Prompt 4
-
-**Prompt:**
 > Which Nevada accounts have the largest employee counts and active open opportunities? Summarize why each account may be a good sales priority.
 
-**Steps & tools used:**
-1. Bash: `sf data query` with a parent-child SOQL — `SELECT Name, NumberOfEmployees, Industry, Type, (SELECT Name, StageName, Amount, CloseDate FROM Opportunities WHERE IsClosed = false) FROM Account WHERE BillingState = 'NV' ORDER BY NumberOfEmployees DESC`; formatted with inline Python.
+| | Iteration 1 — Default tools | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | 1 parent-child SOQL (NV accounts + open opps) | 1 relationship subquery (33 NV accounts + nested open opps) |
+| **Result** | Tiered priorities; top picks Xavier Road, Cactus Valley, Everline, Laurel Terrace; deprioritized Partner-type (no opps) | Same top picks and same reasoning; Partner-type accounts correctly excluded; identified the physical-security product theme |
+| **Effort / notes** | Hand-wrote the parent-child SOQL, knew the child relationship name; also revealed the org has 34+ NV accounts (contradicting P3's "30") | One subquery returned accounts + open opps together, no manual joining |
 
-Tools: `sf` CLI (`data query` / relationship SOQL) via Bash. No MCP.
+**Verdict:** *Tie.* Same query pattern, same conclusions.
 
-**Full response:**
-Ranked NV accounts by headcount, requiring open opps, into tiers:
-- **Tier 1 (2,500 emp):** Cactus Valley Storage (3 opps, $175K, land-and-expand), Xavier Road Logistics (2 opps, $425K, $175K in Negotiation — highest value, imminent), Laurel Terrace Housing (1 small opp, under-penetrated whitespace).
-- **Tier 2 (800–1,200):** Everline Property Trust ($375K, progressing), Yucca Grove Healthcare ($175K at Proposal, near-term), Kingsport Distribution (Prospect, 2 deals both in Negotiation — net-new logo).
-- **Notable smaller-headcount high-value:** Xenia Market Group ($250K), Foothill Retail Collective ($398K, 2 in Negotiation), Queen Creek Hotels ($250K).
-- **Deprioritize:** NV Partner-type accounts (Turnstile Tech, Quartz City, AccessPoint Integrators, FacilityShield) — no open opps.
-Each with a "why prioritize" rationale (size × stage × deal value). Full prose delivered to user.
+### Prompt 5 — Security-equipment buyers (CA/NV/AZ/CO)
 
-**Effort & accuracy notes:**
-- Steps: 1 Bash call (single relationship query returned all NV accounts + open opps).
-- Data source: live Account+Opportunity data via relationship SOQL.
-- Correct / complete: Query is precise (server-side filter IsClosed=false, ORDER BY headcount). Prioritization reasoning is my analysis layered on the data.
-- **Correction surfaced:** This query returned 34+ NV accounts, proving Prompt 3's "30 = full org" was just the LIMIT 30 cap. Prompt 3 was a partial sample; the org has many more accounts than 30. Logged here for the analysis.
-- Friction: Required writing a parent-child SOQL by hand and knowing the child relationship name (`Opportunities`). "Sales priority" ranking (size vs. stage vs. value trade-offs) is interpretive, not returned by the tool.
-
-### Prompt 5
-
-**Prompt:**
 > Find accounts in California, Nevada, Arizona, and Colorado that look like security equipment buyers. Use account fields, descriptions, and related opportunity context to explain your reasoning.
 
-**Steps & tools used:**
-1. Bash: `sf data query` — Account WHERE BillingState IN ('CA','NV','AZ','CO') with child Opportunities subquery + Description; inline Python keyword-scanned opp names/descriptions for security signals. (First attempt errored on a Python variable-name typo `byState` vs `bystate`; reran successfully — query itself was fine, 101 accounts.)
-2. Bash: second `sf data query` pulling raw `Description` text for a sample to see what descriptions add beyond opp products.
+| | Iteration 1 — Default tools | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | 2 calls (+1 retry from a Python typo); 101 accounts + Description keyword scan | 1 call; 88 accounts (those with opps) + Description + opp context, parsed offline |
+| **Result** | **Whole org = security buyers**; the buying signal lives in the structured `Description` ("current footprint… next motion…"); tiered strongest buyers | Same core finding; footprint mix quantified (15 "legacy keys" = greenfield); top pick **Falcon Gate Manufacturing** |
+| **Effort / notes** | Needed a keyword regex; had to read free-text to realize the signal lived there; one code error cost a retry | One query returned everything; the free-text `Description` carried the richest signal |
 
-Tools: `sf` CLI (`data query` / relationship SOQL) via Bash + inline Python keyword scan. No MCP.
+**Verdict:** *Tie / slight standard MCP* (no retry). Both discovered the whole book is security buyers and the signal is in the Description.
 
-**Full response:**
-Key finding: **all 101 accounts in these states are security-equipment buyers** — the org is a physical-security/access-control vendor. Every Account.`Description` follows a structured template ("...current footprint: X; hidden insight: likely next motion is Y; locations=N; rating=...; territory=...") and 100% of opps are security products (badge readers, access control, cameras, smart locks, visitor kiosks, entry systems, maintenance plans). So the answer reframes to *strongest* buyers segmented by signal:
-- **Tier 1 highest-value active:** Everline Property Trust (NV $550K), Alta Canyon Clinics (CA $550K), Nevada Horizon Hotels (CO $510K), Queen Creek Hotels (NV $500K), Zephyr Ridge Transport (CA $398K), Foothill Retail Collective (NV $398K).
-- **Tier 2 explicit "next motion" upsell:** multi-site rollout (Garnet Trail AZ, Valencia Campus AZ $367K, Tamarack Health AZ $332K), camera expansion (Junction Peak AZ), maintenance attach (Vista Ridge AZ, Prairie View AZ, Red Rock CO), visitor management (Rosewood AZ).
-- **Deprioritize:** ~13 Type=Partner accounts with 0 opps (installers/channel, not buyers) — listed by state.
-- Reasoning method: Type (Customer/Prospect=buyer, Partner=channel) discriminates, not Industry; Description's footprint→next-motion template is the best signal; opp context confirms 100% security intent. Full prose delivered to user.
+### Prompt 6 — At-risk open opportunities
 
-**Effort & accuracy notes:**
-- Steps: 2 Bash calls (+1 failed attempt due to my Python typo).
-- Data source: live Account+Opportunity data + Description free-text via SOQL.
-- Correct / complete: Strong result — surfaced that the entire org is one security-domain dataset and that Descriptions carry an explicit "next motion" upsell signal the tool doesn't interpret on its own. Keyword scan and tiering are my heuristics.
-- Friction: Needed a keyword regex to detect "security" intent (no structured product-category field); had to read Description free-text to realize the buying signal lived there; one code error cost a retry. Interpreting "looks like a buyer" is entirely analytical layered on raw rows.
-
-### Prompt 6
-
-**Prompt:**
 > Find open opportunities closing soon that have weak next steps, no recent activity, or overdue related tasks. Summarize why each deal may be at risk.
 
-**Steps & tools used:**
-1. Bash: aggregate SOQL to find open-opp close-date range → discovered earliest close is 2026-12-16 (nothing within literal 90 days of system date 2026-07-01). Concluded demo "present" is offset to ~Dec 2026.
-2. Bash: SOQL for the 64 opps closing on/before 2027-01-15 with NextStep/LastActivityDate/Account; saved IDs to /tmp.
-3. Bash: SOQL for 128 related Tasks (WhatId IN opp-ids) with Status/ActivityDate/IsClosed.
-4. Bash: Python scoring pass combining all 3 signals (null/stale activity, missing/product-mismatched NextStep, overdue open tasks, +imminent close), anchored to PRESENT=2026-12-15; ranked at-risk deals.
+| | Iteration 1 — Default tools | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | 4 calls (aggregate + 2 pulls + Python scoring); anchored "present" to ~Dec-15 | 1 call over 229 open opps, analyzed offline |
+| **Result** | 27/64 scored at-risk; **templated `NextStep`** across all deals; ~30 zero-activity; top: Juniper Hill $250K | 41-deal at-risk cohort; **44% have zero logged activity**; same templated-NextStep + `HasOverdueTask`/`PushCount`/`LastStageChangeDate` all unpopulated; same top deals |
+| **Effort / notes** | Heavy manual assembly; **detected the offset demo dates** (a naive 90-day filter returns zero) | One query; key move was verifying which risk fields are even populated (most aren't) and pivoting to activity-absence |
 
-Tools: `sf` CLI (aggregate + relationship SOQL) via Bash + inline Python scoring. No MCP.
+**Verdict:** *Tie.* Iteration 1 was more rigorous on the date-offset trap; MCP reached the same findings in far fewer calls.
 
-**Full response:**
-Reframed "closing soon" to the earliest tranche (Dec 2026–Jan 15 2027, 64 opps) due to offset demo dates. Scored 27 of 64 as at-risk. Top compounding-risk deals: Juniper Hill Academy Entry System $250K (no activity + mismatched next step + closes Dec 19), Copper Sky Storage $250K (stale since Nov 9 + overdue task + mismatch), Wildflower Schools $175K, Lakepoint Distribution $250K (no activity, late stage), Kingsley Health Network $250K (stale + overdue task), Laguna Property Trust $250K.
-**Headline systemic finding:** NextStep is filler across all 64 — every value is one of ~6 generic templated strings, frequently mismatched to the deal's product (e.g. "camera coverage site walk" on a Smart Lock deal). ~30 deals have LastActivityDate null (biggest signal). Overdue open tasks were the weakest signal (only a couple). Full tables + risk drivers delivered to user.
+### Prompt 7 — Underworked hot/warm leads
 
-**Effort & accuracy notes:**
-- Steps: 4 Bash calls (1 exploratory aggregate + 2 data pulls + 1 scoring).
-- Data source: live Opportunity + Task data via SOQL.
-- Correct / complete: Thorough — combined 3 signals into a reproducible score. Surfaced the offset-date issue and the templated-NextStep pattern, neither obvious upfront.
-- **Date friction (important for comparison):** "closing soon" is undefined against the system clock — demo close dates are ~5.5 months in the future, so a naive 90-day filter returns ZERO. Had to detect the offset and pick a sensible anchor (~2026-12-15) manually. An agent relying on `TODAY()`/relative date literals would have returned an empty/incorrect result. "Overdue" is also anchor-dependent.
-- Friction: Heavy manual assembly — 4 queries, ID plumbing through /tmp, custom scoring heuristics, and the product-mismatch detection regex. "Weak next step" required inventing a definition (templated/mismatched) since NextStep is never actually blank.
-
-### Prompt 7
-
-**Prompt:**
 > Which hot or warm leads look underworked? Group them by lead source, campaign, state, and partner referral.
 
-**Steps & tools used:**
-1. Bash: aggregate SOQL — Lead GROUP BY Rating, Status (to see the population) + a 5-row field sample to confirm field names (State, LeadSource, Partner_Referral__r.Name).
-2. Bash: full pull of 263 open Hot/Warm leads with `Partner_Referral__r.Name` and a `CampaignMembers` child subquery (Campaign.Name); inline Python scored "underworked" (rating Hot/Warm + status not Qualified + null/stale activity anchored to 2026-12-15) and grouped by all 4 dimensions with Counters.
+| | Iteration 1 — Default tools | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | 2 calls (profile + pull/score/group) | 2 calls (funnel shape + 263-lead pull), grouped offline |
+| **Result** | 166/263 underworked (looser definition), 93 hot; grouped by source/campaign/state/partner; 29 partner-referred | 94/263 underworked (tighter definition), 50 hot; **0 of 94 partner-referred — all 69 partner leads are worked** |
+| **Effort / notes** | Had to invent "underworked"; counted each lead's first campaign only (a silent simplification) | Relationship traversal returned all four groupings from one result set; verified the partner-referral finding |
 
-Tools: `sf` CLI (aggregate + relationship SOQL) via Bash + inline Python. No MCP.
+**Verdict:** *Tie.* Different (defensible) definitions; MCP's "the gap is entirely non-partner leads" cut is a sharper insight.
 
-**Full response:**
-Defined underworked = Hot/Warm + Status in (Open/Contacted/Unqualified) + LastActivityDate null or >~30 days stale. 166 of 263 (63%) qualify; 93 are Hot & untouched (biggest urgency).
-- **By Lead Source:** Web 42, External Referral 39, Advertisement 30, Partner 29, Trade Show 26.
-- **By Campaign:** evenly spread across ~18 campaigns (7–12 each) → systemic follow-up gap, not one campaign. Top: Colorado Facility Safety Roadshow 12, Multi-Site Access Control Webinar 12, Phoenix Entry System Modernization 11, etc.
-- **By State:** NV 43, CA 39, WA 21, CO 18, AZ 15, NM 11, UT 8, OR 7, ID 4 (NV+CA = half).
-- **By Partner Referral:** 137 none; 29 partner-referred spread over ~13 partners (CameraWorks 4, EntryGuard 4, Quartz City 3, SecurePath 3…).
-- Triage recommendation: 93 Hot-untouched first, then Web/External Referral, then 29 partner-referred (protect channel), focus NV+CA. Full tables delivered to user.
+### Prompt 8 — Campaign follow-up gap
 
-**Effort & accuracy notes:**
-- Steps: 2 Bash calls (1 profiling + 1 pull/score/group).
-- Data source: live Lead + CampaignMember data via relationship SOQL.
-- Correct / complete: Clean multi-dimensional grouping. Population sanity-checked first. Grouping is exact (Counters); "underworked" threshold is my definition.
-- Friction: "Underworked" is undefined — had to construct it (rating + status + activity recency). Same offset-date issue as Prompt 6 (anchored recency to 2026-12-15, not system date). Grouping by campaign required knowing leads join campaigns via the CampaignMembers child relationship, not a direct field. Only counted each lead's first campaign membership (simplification; a lead in multiple campaigns is attributed once) — a silent simplification worth noting.
-
-### Prompt 8
-
-**Prompt:**
 > Find campaigns with strong engagement but limited sales follow-up. Include the campaign name, related leads or campaign members, and the follow-up gap.
 
-**Steps & tools used:**
-1. Bash: aggregate SOQL — CampaignMember GROUP BY Campaign, Status → response rate per campaign (engagement).
-2. Bash: pull all 336 Responded members with Lead.Status/IsConverted/LastActivityDate/Rating + ContactId; Python computed per-campaign follow-up gap (responded but unconverted, not Qualified, no/stale activity). (First attempt errored — accessed `r['Name']` but relationship field returns nested `r['Campaign']['Name']`; fixed and reran.)
-3. Bash: SOQL listing the specific unworked responded leads (name/rating/status/state) for the top-3 gap campaigns.
+| | Iteration 1 — Default tools | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | 3 calls (+1 retry on a nested-field JSON gotcha) | 3 calls (rollups + two filtered join-aggregates) |
+| **Result** | Engagement uniform across 18 campaigns; **0/336 responders ever converted**; worst gaps named + individual dropped leads listed | **9 campaigns at a 100% follow-up gap**; every campaign ≥47%; gap computed cleanly via join-aggregate |
+| **Effort / notes** | Relationship-field JSON trap (`Campaign.Name` nested) caused a retry; invented both "engagement" and "gap" | Metric had to be *built* from the CampaignMember→Lead join server-side; ratios exact |
 
-Tools: `sf` CLI (aggregate + relationship SOQL) via Bash + inline Python. No MCP.
+**Verdict:** *Tie.* Same systemic finding; Iteration 1 named names, MCP quantified more cleanly.
 
-**Full response:**
-Engagement uniform across all 18 campaigns (response 40–44%) → not the differentiator. Structural finding: **0 of 336 responded members ever converted to a contact** — follow-up weak everywhere; ranked by severity.
-- Worst gaps: Western Region Maintenance Attach 17/18 (94%), Education Campus Access Review 15/19 (79%), Dormant Customer Winback 15/19 (79%), Colorado Facility Safety Roadshow / Denver Access Control Clinic / Healthcare Lobby Modernization (72%), Multi-Site Access Control Webinar (70%)…
-- Named the specific dropped Hot/Warm leads per top-3 campaign (e.g. Western Region: Hot = Miles Hernandez/Naomi Kim/Elena Watson/Lena Powell/Cameron Reynolds; etc.).
-- Takeaway: top-3 to action combine highest gap% + most hot/warm; Dormant Customer Winback especially wasteful (paid re-engagement, 43% response, no follow-up). Full tables + name lists delivered to user.
+### Prompt 9 — Top risk: 360° records + next question
 
-**Effort & accuracy notes:**
-- Steps: 3 Bash calls (+1 failed attempt due to nested-field access).
-- Data source: live CampaignMember + Lead data via aggregate & relationship SOQL.
-- Correct / complete: Strong, specific result — quantified gap and named individual leads. Response-rate + gap computed exactly; "follow-up gap" threshold is my definition.
-- Friction: Relationship-field JSON gotcha (`Campaign.Name` returns nested object, not flat `Name`) caused a retry — an SOQL/JSON-shape trap. "Strong engagement / limited follow-up" both required definitions I invented (response% for engagement; unconverted+unqualified+stale for gap). Same offset-date anchor (2026-12-15). Also relied on CampaignMember.ContactId being null as the "not converted" proxy — reasonable but a modeling assumption.
-
-### Prompt 9
-
-**Prompt:**
 > For the highest-priority risk you found, show the related records and recommend the next question I should ask before taking action.
 
-**Steps & tools used:**
-1. Identified the top risk from Prompt 6: Juniper Hill Academy – Entry System Upgrade ($250K, Negotiation, closes Dec 19).
-2. Bash: Python multi-query pull (opp detail + tasks + account + sibling opps + contacts + open cases). First attempt errored: `Contact.Name` is not a valid relationship path from Opportunity.ContactId.
-3. Bash: isolated the error via `--json` message → confirmed the bad relationship path.
-4. Bash: reran without `Contact.Name`; retrieved all related records.
+| | Iteration 1 — Default tools | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | ~3 calls (+1 error on a bad relationship path) stitched in Python | 4 calls (Account, opps, contacts, tasks) |
+| **Result** | Caught contradictions: created *yesterday* yet at 90%/Negotiation, no activity, no primary contact → "is the stage even real?"; found a likely buyer + two blocking cases | Caught the Task allocation: account looks active (8 tasks) but **all tasks are on the small deals; the $250K flagship is untouched** |
+| **Effort / notes** | Assembling a 360 view took ~6 hand-written queries; hit a relationship-path error needing a debug round-trip | Drill-down via `WhatId` exposed a risk hidden at the account-rollup level |
 
-Tools: `sf` CLI (multi-object relationship SOQL) via Bash + inline Python. No MCP.
+**Verdict:** *Tie.* Complementary discoveries; both landed on "is the 90% real?"
 
-**Full response:**
-Showed full related-record picture and surfaced contradictions making the deal riskier/suspect:
-- Opp: Negotiation, Probability 90% but ForecastCategory only "Pipeline" (inconsistent); **Created 2026-06-30 (yesterday)** yet already at Negotiation/90%; LastStageChangeDate null; LastActivityDate null; **zero related Tasks**; NextStep references a kiosk pilot on an Entry System deal (product mismatch); **no primary Contact**.
-- Account: Juniper Hill Academy, Customer/Retail/45emp/Irvine CA, Hot, 16 locations, description points to multi-site (not entry system); account LastActivityDate 2026-12-09 (activity exists but not tied to opp).
-- Sibling open opps: Warehouse Camera Expansion $85K (Prospecting), Multi-Site Access Control $18K (Proposal).
-- Contacts (none linked): Emerson Khan & Cameron Kim (Ops Mgrs), **Morgan Ross – Campus Safety Lead** (likely buyer).
-- Open cases: two "Smart lock battery alert" (Medium/New, 00001083 & 00001113 — dup) = satisfaction/blocker risk.
-- **Recommended next question:** "Is this $250K deal real and actually in negotiation — or is the 90%/Negotiation stage inaccurate?" Rationale: record tells suggest possible data-hygiene issue vs. genuine risk; every downstream action depends on the answer. Included concrete phrasing for the rep + follow-on actions (attach Morgan Ross, resolve cases, fix next step, owner call).
+### Prompt 10 — Bar chart: open pipeline by stage
 
-**Effort & accuracy notes:**
-- Steps: 3 Bash calls (+1 failed attempt on a bad relationship path).
-- Data source: live multi-object pull (Opportunity, Task, Account, Contact, Case) via SOQL.
-- Correct / complete: Very strong — the 360° pull exposed contradictions (created-yesterday + 90% + no activity/contact + mismatched next step) that reframed the "risk" as possibly a data-quality problem, plus found a relevant buyer contact and two blocking cases.
-- Friction: Assembling a 360 view took ~6 separate SOQL queries hand-written and stitched in Python (no built-in "related records" view). Hit an SOQL relationship-path error (`Contact.Name` invalid from Opportunity) needing a debug round-trip. Choosing which objects constitute "related records" and interpreting the contradictions is entirely my judgment. NOTE: the two open cases are literally titled "Workshop Support:" — suggests the org is seeded workshop data.
-
-### Prompt 10
-
-**Prompt:**
 > Create a bar chart that compares open pipeline by opportunity stage. Use the live opportunity data you can access through Salesforce MCP tools.
 
-**⚠️ Note:** Prompt explicitly asks for Salesforce **MCP tools**, but this is Iteration 1 (default tools). Ran it with sf CLI + SOQL and flagged the discrepancy to the user. This prompt is the natural showcase for Iteration 2.
+| | Iteration 1 — Default tools | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | 1 aggregate query → ASCII chart, then `pip install matplotlib` + script + render (~4 extra calls) | 1 aggregate query (1 timeout, retried) + matplotlib render |
+| **Result** | $24.98M across 229 opps; Proposal/Price Quote the largest ($6.27M) | Identical numbers; chart at `workshop-assets/iteration-2/p10-open-pipeline-by-stage.png` |
+| **Effort / notes** | Real PNG required installing a plotting lib first | Data cleaner to get; **neither MCP server draws charts — Claude's matplotlib does** |
 
-**Steps & tools used:**
-1. Bash: `sf data query` aggregate — `SELECT StageName, COUNT(Id), SUM(Amount) FROM Opportunity WHERE IsClosed=false GROUP BY StageName`; inline Python ordered stages and computed % of total.
-2. Rendered an ASCII bar chart (by $ and by count) in the terminal response.
+**Verdict:** *Slight standard MCP.* Same result, cleaner data path. Key myth-buster: visualization is the model's tooling, not the MCP server.
 
-Tools: `sf` CLI (aggregate SOQL) via Bash + inline Python. No MCP (contra the prompt's instruction).
+### Prompt 11 — Pie chart: hot/warm open leads by source
 
-**Full response:**
-Open pipeline total $24,983,000 across 229 opps. Only 6 of 10 stages used (Id. Decision Makers, Perception Analysis unused). By amount:
-- Proposal/Price Quote $6,268,000 (54 opps) 25.1% — largest
-- Qualification $4,593,000 (39) 18.4%
-- Needs Analysis $3,797,000 (33) 15.2%
-- Prospecting $3,682,000 (35) 14.7%
-- Negotiation/Review $3,499,000 (34) 14.0%
-- Value Proposition $3,144,000 (34) 12.6%
-Delivered ASCII bar charts (by $ and by count). Read: bottom-heavy at Proposal/Price Quote (healthy late-stage weight), rest evenly spread. Then generated a real PNG image on request:
-
-![Open Pipeline by Opportunity Stage](workshop-assets/pipeline-by-stage.png)
-
-_Rendered PNG (`workshop-assets/pipeline-by-stage.png`) produced after installing matplotlib and re-querying the live aggregate._
-
-**Effort & accuracy notes:**
-- Steps: 1 Bash call.
-- Data source: live Opportunity aggregate via SOQL.
-- Correct / complete: Aggregation is exact and matches the org. Numbers are trustworthy.
-- **Chart limitation (key for comparison):** default tools produce only a *text/ASCII* chart inline by default. Producing a *real* rendered image required extra manual steps: (1) check for a plotting lib → none present; (2) `pip install matplotlib`; (3) write a matplotlib script re-querying the aggregate and styling the bars; (4) render to PNG; (5) visually verify; (6) embed in the doc. ~4 additional Bash calls beyond the data query. The PNG (`workshop-assets/pipeline-by-stage.png`) is now embedded above.
-- **Prompt/tool mismatch:** the prompt presupposes MCP tools; under Iteration 1 I substituted SOQL. Worth watching whether the Salesforce MCP server returns a native chart/visualization or richer artifact in Iteration 2, vs. this ASCII fallback.
-
-### Prompt 11
-
-**Prompt:**
 > Create a pie chart that shows hot and warm open leads by lead source.
 
-**Steps & tools used:**
-1. Bash: `sf data query` aggregate — `SELECT LeadSource, COUNT(Id) FROM Lead WHERE IsConverted=false AND Rating IN ('Hot','Warm') GROUP BY LeadSource`; piped straight into a matplotlib script that rendered a pie chart PNG (matplotlib already installed from Prompt 10).
-2. Read/verified the PNG visually.
+| | Iteration 1 — Default tools | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | 1 aggregate + matplotlib (already installed) | 1 aggregate + matplotlib |
+| **Result** | 263 hot/warm open leads (Partner 26% largest) | 73 leads with `Status='Open'` (Partner 30% largest) |
+| **Effort / notes** | Different denominator (all hot/warm open) | Different denominator (`Status='Open'` only); flagged `LeadSource` vs `Partner_Referral__c` |
 
-Tools: `sf` CLI (aggregate SOQL) via Bash + matplotlib. No MCP.
+**Verdict:** *Tie.* Both rendered a PNG; the count differs only because each chose a different definition of "open."
 
-**Full response:**
-263 hot/warm open leads by source:
-- Partner 69 (26.2%), External Referral 54 (20.5%), Web 53 (20.2%), Advertisement 49 (18.6%), Trade Show 38 (14.4%).
-Rendered PNG:
+### Prompt 12 — Timeline: campaign response activity
 
-![Hot & Warm Open Leads by Lead Source](workshop-assets/hotwarm-leads-by-source.png)
-
-Read: Partner is the single largest high-intent source (26%); Partner + External Referral (relationship-driven) = 47% ≈ half; even overall distribution.
-
-**Effort & accuracy notes:**
-- Steps: 1 Bash call (query + render combined) + 1 Read to verify.
-- Data source: live Lead aggregate via SOQL.
-- Correct / complete: Exact aggregation; real rendered PNG this time (not ASCII), because matplotlib was already installed from Prompt 10 — so the one-time setup cost is now amortized. Query+render fused into a single step.
-- Friction: Minimal now that tooling is in place. Still required hand-writing the SOQL + a matplotlib script and choosing chart styling/labels manually; no native "make a pie chart" affordance. Note the count differs from Prompt 7's per-source underworked figures (that counted only *underworked* leads; this counts *all* hot/warm open leads) — consistent, different denominators.
-
-### Prompt 12
-
-**Prompt:**
 > Create a line chart or timeline that shows campaign response activity over time. Explain any spike or drop you see in the data.
 
-**Steps & tools used:**
-1. Bash: SOQL on `CampaignMember.FirstRespondedDate` → discovered all 336 stamped on one date (2026-12-15). Useless as a timeline.
-2. Bash: probed alternative time dimensions — CampaignMember.CreatedDate (all one instant 2026-06-30), Campaign StartDate/EndDate (weekly launch cadence Jun→Oct 2026), Task.ActivityDate (real monthly spread Jul 2026→Feb 2027).
-3. Bash: matplotlib script building a 2-panel figure — (a) responses mapped to each campaign's launch date, (b) weekly sales-task activity with the 2026-12-15 seed date marked.
-4. Read/verified the PNG.
+| | Iteration 1 — Default tools | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | 3 calls (probed several date fields) + matplotlib | 4 calls (incl. one SOQL error) + matplotlib |
+| **Result** | Detected all responses stamped one date (seed); built 2 proxies incl. a **real weekly Task-activity trend** with a Dec-15 seeding artifact | Detected the same single-date seed; pivoted to `Campaign.StartDate`; reported flatness as the finding |
+| **Effort / notes** | Avoided the trap of charting the seed-date field and inventing a fake spike | Same trap avoided; Iteration 1 additionally surfaced a genuine activity trend |
 
-Tools: `sf` CLI (SOQL + aggregate) via Bash + matplotlib. No MCP.
+**Verdict:** *Tie / slight Iteration 1.* Both dodged the fake-spike trap; the default run found one extra real trend.
 
-**Full response:**
-Led with the data caveat: FirstRespondedDate and member CreatedDate are single-instant seed values, so a literal responses-over-time chart is one vertical line. Built two proxies:
-- **Responses by campaign launch date:** 18 campaigns on weekly cadence, responses flat at 18–20 each. "Spikes"/dips are ±1 noise on a ~44 base, not signal — synthetic ~42% uniform response rate.
-- **Weekly task activity (real trend):** ramp Jul→Oct, ~55–65/wk plateau Oct–early Dec, dip to ~45 early Dec, sharp jump to ~90/wk at the 2026-12-15 seed date, sustained through Jan, drop-off Feb.
-- **Explanation:** no authentic marketing spike/drop exists; campaign responses are deliberately uniform; the only dramatic movement (Dec-15 task jump) is a data-seeding artifact (seed date = dataset "today"; completed tasks back-dated, planned tasks forward-clustered). Feb drop = forward edge of generated data.
-Rendered PNG:
+### Prompt 13 — One-page sales-leader PDF
 
-![Campaign response timeline](workshop-assets/campaign-response-timeline.png)
-
-**Effort & accuracy notes:**
-- Steps: 3 Bash calls (2 exploratory + 1 render) + 1 Read.
-- Data source: live CampaignMember, Campaign, Task via SOQL.
-- Correct / complete: Strong — avoided the trap of charting the seed-date field and inventing a fake spike narrative. Correctly diagnosed uniform synthetic responses and identified the Dec-15 jump as a generation artifact. Required judgment to pick usable time dimensions.
-- **Key comparison signal:** the "obvious" field (FirstRespondedDate) is a dead end; answering well required *exploring* several date fields and recognizing synthetic data. A tool that naively charts the requested field would produce a misleading single-spike chart and possibly fabricate an explanation. Good adversarial test for Iteration 2.
-- Friction: Multiple exploratory queries to find any field with real time variation; manual 2-panel chart construction; the whole "explain the spike" answer hinges on recognizing the data is seeded (interpretation, not tool output).
-
-### Prompt 13
-
-**Prompt:**
 > Create a one-page PDF summary for a sales leader. Include the strongest account signals, the riskiest open opportunities, missed lead or campaign follow-up, and the next questions a seller should ask.
 
-**Steps & tools used:**
-1. Bash: checked PDF tooling — matplotlib PDF backend available; reportlab/wkhtmltopdf/pandoc absent. Chose matplotlib backend (no install needed).
-2. Bash: confirming top-line SOQL aggregates (open pipeline $24.98M/229, **152 accounts**, 263 hot/warm leads, 336 responders).
-3. Bash: matplotlib script laying out a one-page 8.5x11 executive PDF (header, KPI strip, 4 sections) synthesizing findings from Prompts 1–12. First attempt errored (passed `'italic'` to fontweight instead of style); fixed and regenerated.
-4. Bash: validated PDF header + single-page structure (couldn't render inline — poppler not installed).
+| | Iteration 1 — Default tools | Iteration 2 — Standard MCP |
+|---|---|---|
+| **Tools & steps** | matplotlib PDF backend + 1 confirming aggregate (+1 bug retry) | 1 confirming aggregate + matplotlib PDF |
+| **Result** | `workshop-assets/sales-leader-summary.pdf`; confirmed **152 accounts** | `workshop-assets/iteration-2/p13-sales-leader-summary.pdf`; verified 1 page via pypdf |
+| **Effort / notes** | Hand-built layout coordinate-by-coordinate; couldn't preview (no poppler) | Same tooling constraints; pure synthesis of prior prompts |
 
-Tools: `sf` CLI (aggregate SOQL) via Bash + matplotlib PDF backend. No MCP.
+**Verdict:** *Tie.* Both synthesize prior findings with the same tooling limits; the MCP server plays no role in PDF generation.
 
-**Full response:**
-Generated `workshop-assets/sales-leader-summary.pdf` — one-page synthesis with KPI strip and 4 sections:
-- **Strongest account signals:** whole org is a security-buyer base with "next motion" upsell signals; top expansion accounts (Everline $550K, Alta Canyon $550K, Nevada Horizon $510K, Queen Creek $500K, Xavier Road $425K); high-intent multi-site/maintenance-attach upsells; NV+CA concentration.
-- **Riskiest opps:** 27/64 at-risk; templated/mismatched NextStep + ~30 zero-activity late-stage deals; #1 Juniper Hill $250K + Copper Sky, Lakepoint, Kingsley, Wildflower, Laguna.
-- **Missed follow-up:** 166/263 hot-warm underworked (93 hot-untouched); 0/336 responders converted; worst campaigns Western Region (94%), Education Campus (79%), Dormant Winback (79%).
-- **Next questions:** 5 seller questions (confirm Juniper Hill deal reality; identify economic buyer; product-correct next steps; why zero conversions; which 93 hot leads to work this week).
-Footer notes the seeded/offset-date caveat.
+### Prompt 14 — Account health (Arroyo Medical Group)
 
-_PDF artifact: [`workshop-assets/sales-leader-summary.pdf`](workshop-assets/sales-leader-summary.pdf)_
-
-**Effort & accuracy notes:**
-- Steps: 3 Bash calls (+1 failed attempt on a fontweight/style bug) + validation.
-- Data source: synthesis of all prior live-data findings + 1 confirming aggregate query.
-- Correct / complete: Delivered a genuine one-page PDF grounded in the org data. Confirmed **152 accounts** (again contradicting Prompt 3's LIMIT-30 "full org" — logged).
-- **PDF limitation (key for comparison):** no native "make a PDF" affordance; had to hand-build layout coordinate-by-coordinate in matplotlib (manual x/y positioning, section boxes, line wrapping by hand). A code bug cost a retry. Could not preview the PDF inline (poppler absent) — validated structurally only.
-- Friction: This is the heaviest manual-assembly prompt — the entire executive narrative, prioritization, and layout are my synthesis; the tools only supplied raw numbers. Strong candidate to compare against whatever document/report generation the Salesforce MCP server offers in Iteration 2.
-
----
-
-## Iteration 1 — wrap-up
-
-**13 prompts executed with default Claude tools (sf CLI + SOQL + Python/matplotlib; no MCP).**
-
-Recurring themes across the run (for the eventual comparison):
-1. **Every answer required hand-written SOQL** and, for anything analytical, custom Python to aggregate/score/join — there is no plain-language query layer (you can't just ask in natural language).
-2. **Interpretation was always mine** — "relevant," "at-risk," "underworked," "strong engagement," "sales priority" all needed definitions I invented; the tools return rows, not judgment.
-3. **Offset/synthetic demo dates** repeatedly broke naive assumptions (Prompt 6's empty 90-day filter; Prompt 12's single-date response field). Answering well required *detecting* the data was seeded — a real accuracy risk for a naive agent.
-4. **Data-quality traps** surfaced only by pulling records (templated NextStep, 0/336 conversions, the Juniper Hill contradictions, LIMIT-30 masquerading as "full org").
-5. **SOQL/JSON gotchas** cost several retries (nested relationship fields, invalid relationship paths, aggregate quirks).
-6. **Visualizations/PDF needed extra tooling** (matplotlib install) and manual, coordinate-level construction — no native chart/report output.
-
-Artifacts produced: `workshop-assets/pipeline-by-stage.png`, `hotwarm-leads-by-source.png`, `campaign-response-timeline.png`, `sales-leader-summary.pdf`.
-
-
-### Prompt 14 (Iteration 1 — default tools)
-
-**Prompt:**
 > Find the Account named Arroyo Medical Group and check the account health.
 
-**Steps & tools used:**
-1. Bash: `sf data query` to find the account by name → Id `001bm00002HgMUGAA3` (Customer/Education/WA/125 emp).
-2. Bash: wrote anonymous Apex (`/tmp/health.apex`) invoking the org's three scoring classes (ActivityEngagementScore, OpportunityHealthScore, SupportSignalsScore) for the account; ran via `sf apex run -f`; parsed USER_DEBUG output.
+| | Iteration 1 — Default tools | Iteration 2 — Custom MCP |
+|---|---|---|
+| **Tools & steps** | **14:** hand-wired anonymous Apex invoking the 3 scoring classes. **14b (fair baseline):** raw-data pull + self-devised rubric (no Apex) | 2 calls: find the account + `Account_Health_Check_Calculator` |
+| **Result** | **14:** 56.67/100 (Activity 0/30). **14b:** qualitative "healthy-but-watch," **opposite** engagement read — spotted real Dec-2026 activity the Apex's `Date.today()` misses | **56.67/100** with a 30/30/40 breakdown — reproduces the Apex's date-blind Activity 0/30 |
+| **Effort / notes** | Needs deep Apex knowledge *or* an invented rubric; not repeatable | One governed call returns the org's own health definition — **but inherits the date-blind bug that 14b caught** |
 
-Tools: `sf` CLI (`data query` + `apex run` anonymous Apex) via Bash. No MCP.
+**Verdict:** *Custom MCP* (for convenience & standardization). One call vs. Apex expertise or a from-scratch rubric — with the caveat that a custom tool is only as correct as its internal logic.
 
-**Full response:**
-Overall Health **56.67 / 100** (moderate):
-- Activity & Engagement **0.0/30** (Past Tasks 60d:0, Past Events:0, Future Events:0)
-- Opportunity Health **30.0/30** (Closed-Lost 6mo:0, Won:1, Open:2)
-- Support Signals **26.67/40** (Recent cases 30d:2, Baseline:0, Escalated:2, Unresolved critical:0)
-Interpretation: commercially healthy/expanding customer (perfect opp score); 2 recent escalated cases worth watching; Activity=0 is an offset-date artifact (Apex uses Date.today()=2026-07-01 but seeded activity is Oct–Dec 2026), so 56.67 is artificially depressed — date-corrected score would be higher.
+### Prompt 15 — Create a sync meeting *(production write)*
 
-**Effort & accuracy notes:**
-- Steps: 2 Bash calls (lookup + Apex run).
-- Data source: live account + this org's custom Apex scoring logic invoked directly via anonymous Apex.
-- Correct / complete: Reproduced the exact custom score by calling the real Apex classes — the scores are authoritative (same code the flow/custom-MCP would run). Correctly flagged the Activity component as skewed by the offset-date issue.
-- **Key friction for the 3-way comparison:** to get the *custom* health score with default tools, I had to (a) know the scoring classes exist and their API, (b) hand-write anonymous Apex wiring up 3 Request/Response invocations, (c) parse debug logs. There is no plain-language way to ask for it — this is exactly the gap a **custom MCP server** (exposing "check account health" as a tool) would close. Also, the offset-date artifact is baked into the Apex itself (`Date.today()`), so even the custom server would return Activity=0 unless the demo clock is aligned — worth verifying in Iteration 3.
-
-### Prompt 14b (Iteration 1 — default tools, WITHOUT repo Apex classes)
-
-**Prompt:**
-> (Re-run of 14) Find the Account named Arroyo Medical Group and check the account health — but assuming the repo's scoring Apex classes are NOT visible/available. This is the fair baseline vs. the custom MCP server (which will expose those Apex classes as tools).
-
-**Rationale:** Prompt 14 had an unfair advantage — it called the repo's `ActivityEngagementScore`/`OpportunityHealthScore`/`SupportSignalsScore` Apex directly. 14b assumes those don't exist, so "health" must be assessed from raw data with a self-devised framework — the honest default-tools baseline to compare against the custom MCP (Iteration 2/3), which wraps those same Apex classes as callable tools.
-
-**Steps & tools used:**
-1. Bash: single Python multi-query pull of raw records for the account — Account fields+Description, all Opportunities, all Cases, Contacts, recent Tasks.
-2. Reasoned about "health" from scratch across commercial/engagement/support/relationship dimensions (no formula).
-
-Tools: `sf` CLI (`data query` only — no `apex run`, no scoring classes) via Bash. No MCP.
-
-**Full response:**
-Overall qualitative read: **Healthy-but-watch (leaning positive)** — no 0–100 number.
-- Commercial 🟢: Won $175K (Smart Lock, Aug 2026) + 2 open expansion opps ($85K Camera Proposal, $85K Entry System Qualification); no losses.
-- Engagement 🟢: 9 activities incl. completed calls Dec 1 & Dec 3 2026, future touches scheduled; LastActivityDate 2026-12-03 → actively worked.
-- Support 🔴: 2 open High-priority cases, both "Badge reader intermittent failure," both New/unresolved — reliability risk on installed hardware.
-- Relationship 🟢: 3 contacts covering buying committee (Campus Safety Lead, Facilities Director, IT Facilities Manager).
-- Segment 🟡: rated Cold, "legacy keys/manual visitor logs" → low maturity but clear visitor-management upsell opening.
-Key point: this raw read reaches the OPPOSITE engagement conclusion vs. Prompt 14's Apex (Activity 0/30) — because I could see actual Dec-2026 activity dates and reason around the offset, while the fixed Apex (Date.today()=2026-07-01) sees nothing.
-
-**Effort & accuracy notes:**
-- Steps: 1 Bash call (multi-object pull) + reasoning.
-- Data source: live raw records via SOQL only (no scoring Apex).
-- Correct / complete: Arguably *more* contextually accurate than 14 on engagement (caught the offset-date issue that zeroes the Apex Activity score). But NOT standardized — no 0–100, no repeatable methodology, weighting is subjective and could vary run-to-run.
-- **Core 3-way comparison insight:** Default-tools-without-Apex = contextual judgment, no comparable score, and the analyst must invent the health rubric each time. The **custom MCP server** (Iteration 2/3) should return a *standardized, repeatable* score by wrapping the Apex — trading contextual nuance for consistency/comparability. Also flags the offset-date caveat: the Apex-based score (14 / custom MCP) reports Activity 0/30 despite real Dec-2026 activity; 14b does not make that error. Watch whether the custom MCP reproduces the Apex's date-blind 56.67 or corrects for it.
-
-### Prompt 15 (Iteration 1 — default tools, WITHOUT repo Apex classes)
-
-**Prompt:**
 > Create a sync meeting for the account.
 
-**Framing:** Per the 14b baseline, assume the repo's `CreateAccountSyncMeetingTask` Apex is NOT available. Built the meeting manually with default tools, deliberately mirroring that Apex's logic so it's comparable to the custom MCP tool (Iteration 2/3) that will wrap it.
+| | Iteration 1 — Default tools | Iteration 2 — Custom MCP |
+|---|---|---|
+| **Tools & steps** | 3 calls + a confirmation gate; gathered owner/cases/contact, hand-built the `Task` | 1 call `CreateAccountSyncMeetingTask` + 1 read-back to verify (user-confirmed) |
+| **Result** | Task `00Tbm00000DIuqfEAD`, contact Alex Garcia (chosen deterministically), open cases referenced | Task `00Tbm00000DKQWjEAP`, **also Alex Garcia**, open cases auto-embedded, due +7, owner-assigned |
+| **Effort / notes** | Had to know the org's "sync meeting" convention and build the record field-by-field | One call encapsulated contact selection, case lookup, description, and defaults |
 
-**Steps & tools used:**
-1. Bash: gathered account owner, open cases + their contact, and account contacts via SOQL; computed due date = system today+7 (2026-07-08).
-2. AskUserQuestion: confirmed the write (create in org) and the due-date choice (system+7, matching Apex) — this is an outward/hard-to-reverse action.
-3. Bash: `sf data create record -s Task` with Subject/WhatId/WhoId/OwnerId/ActivityDate/Status/Priority/Description → created Task `00Tbm00000DIuqfEAD`.
-4. Bash: verification query confirming the record fields.
-
-Tools: `sf` CLI (`data query` + `data create record`) via Bash. No MCP, no Apex.
-
-**Full response:**
-Created & verified Task `00Tbm00000DIuqfEAD`: "Prepare for Arroyo Medical Group sync meeting with Alex Garcia"; Regarding=Arroyo Medical Group; Who=Alex Garcia (Campus Safety Lead, the contact on both open cases); Owner=account owner (OrgFarm EPIC); Due 2026-07-08; Not Started/Normal; Description references open cases 00001074 & 00001104 (badge reader failures). Mirrored the repo Apex logic (account+case-contact, owner=account owner, due=today+7, open-cases list) but hand-built.
-
-**Effort & accuracy notes:**
-- Steps: 3 Bash calls + 1 confirmation prompt.
-- Data source: live SOQL for inputs; created a real Task record in the org.
-- Correct / complete: Record created and verified. Replicated the Apex's intended behavior manually. Chose Alex Garcia deterministically (contact on the open cases) rather than the Apex's *random* case-contact pick — arguably better, but a behavioral difference.
-- **Key 3-way comparison insight:** With default tools I had to (a) know the org's convention for a "sync meeting" (a Task with specific relationships), (b) gather 3 inputs by hand, (c) construct the record field-by-field, (d) gate the write with a confirmation. A **custom MCP server** exposing `CreateAccountSyncMeetingTask` would do this in one tool call from "create a sync meeting for the account" — encapsulating the field logic, owner assignment, and case-referencing description. Trade-off: the Apex uses `Math.random()` to pick the contact and `Date.today()+7` (offset-blind) — so the custom-MCP output is standardized/one-shot but less transparent and carries the same date-offset quirk. Watch in Iteration 2/3 whether the custom MCP creates an equivalent Task and how it picks the contact/date.
-
-**Iteration 2 (Salesforce MCP) will run the same 13 prompts; the comparison summary section below will be completed afterward.**
-
-<!-- TEMPLATE (copy per prompt)
-### Prompt N
-
-**Prompt:**
-> (verbatim prompt)
-
-**Steps & tools used:**
-- (commands / tool calls, in order)
-
-**Full response:**
-(the complete answer produced)
-
-**Effort & accuracy notes:**
-- Steps: N
-- Data source: (SOQL / apex / local source / knowledge)
-- Correct / complete: (notes)
-- Friction: (notes)
--->
+**Verdict:** *Custom MCP.* One governed call vs. multi-step assembly; notably both runs independently picked the same contact and cases.
 
 ---
 
-## Iteration 2 — Salesforce MCP server
+# Part B — Comparison summary
 
-_To be filled in during the second run._
-
----
-
-## Iteration 3 — Custom Salesforce MCP server (Prompts 14–15 only)
-
-_To be filled in. Prompts 14–15 are additionally run against a custom MCP server that wraps this org's Account Health Check logic. Iteration 1 (default-tools) results for these prompts are recorded below for the three-way comparison._
-
-
----
-
-## Comparison summary
-
-> **This is the deliverable.** Iterations 1 and 2 are inputs; this section is the goal. Completed after Iteration 2, drawing on Iteration 1 (this file) + `iteration-2-results.md` (Iteration 2). Iteration 2 was run **blind** (no access to Iteration 1 during the prompts). Prompts 14–15 in Iteration 2 were run against the **custom MCP server only** (the manual/default-tools path for these is already covered by Iteration 1's 14b/15).
+> **This is the deliverable** — the overall analysis distilled from Part A above. Iteration 2 was run **blind** (no access to Iteration 1 during the prompts), so some numbers differ by design. Prompts 14–15 were run against the **custom MCP server only** in Iteration 2 (the manual/default-tools path for these is covered by Iteration 1's 14b/15).
 
 ### 1. Executive summary
 
