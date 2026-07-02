@@ -629,3 +629,42 @@ _Requested explicitly — a standalone case for MCP, distilled from the run for 
 - *Default tools:* maximum control, maximum manual work.
 - *Standard MCP:* same analysis, far less friction — Claude as a faster analyst.
 - *Custom MCP:* your organization's judgment, one call away — Claude as an operator. **Build it for the metrics and actions everyone re-derives today.**
+
+---
+
+## 10. POV: the business user on Claude web (not Claude Code on a dev workstation)
+
+_This reframes the whole comparison for the audience that actually matters most — non-technical business users._
+
+**The hidden assumption in Iteration 1.** Iteration 1's entire "default tools" baseline exists **only because the run happened on a pre-configured developer workstation** that had the `sf` CLI authenticated, plus Bash, Python, and (after a `pip install`) matplotlib. That is a *developer's* environment. It is **not** what a sales manager, RevOps analyst, or sales leader has.
+
+**What the business user actually has.** A **web chat frontend** (e.g. Claude on the web / a desktop app) with an AI agent, and the ability to **connect MCP servers** that an admin has approved. No terminal. No `sf` CLI. No `apex run`. No Bash. No Python. No `pip install matplotlib`. For this person, **the "default tools" column doesn't exist** — the honest baseline isn't "hand-write SOQL," it's **copy-paste from reports, export CSVs, or ask someone in IT.**
+
+### What changes when there's no CLI
+
+| | Developer on Claude Code (Iteration 1 premise) | **Business user on Claude web (real world)** |
+|---|---|---|
+| Live org data without MCP | Yes — via `sf` CLI/SOQL | **No** — no CLI, no query tool at all |
+| Hand-write SOQL / debug JSON | Possible (it's the friction we measured) | **Not realistically** — not their skill or their surface |
+| Anonymous Apex (Iter-1 Prompt 14) | Possible (hand-wired the scoring classes) | **Impossible** |
+| Build a Task record field-by-field (Prompt 15) | Possible via `data create` | **Impossible** without a tool |
+| Charts / PDF | Yes — but needed `pip install` + scripting | Depends on the web surface's own artifact features (still the *harness*, not MCP) |
+| Get to an answer at all | Effortful but doable | **MCP is the enabler, not the optimizer** |
+
+### The reframed conclusion for business users
+
+1. **For a business user, standard MCP isn't a "friction reducer" — it's the on-ramp.** On a dev workstation, MCP *saved steps* over the CLI. On the web, there is no CLI to save steps over: **MCP is the only practical way to reach live Salesforce data at all.** The comparison shifts from "MCP vs. CLI" to "**MCP vs. nothing / manual exports**."
+
+2. **Custom MCP goes from "nice differentiator" to "the only way they can act."** Iteration 1 reached the account-health score by *hand-wiring anonymous Apex* and created the sync-meeting by *hand-building a Task* — both flatly impossible for a non-technical user. The custom server turns those into a sentence: *"check this account's health," "set up the sync meeting."* For this audience the custom tool isn't a shortcut past SOQL — it's the **difference between "can do it" and "cannot do it at all."**
+
+3. **The interpretation burden matters even more — and cuts both ways.** Claude still supplies the analytical judgment ("at-risk," "underworked"), which is *more* valuable when the user can't fall back on writing their own query. But the flip side is real: a business user **cannot sanity-check the tool the way Iteration 1 did.** They won't notice a `LIMIT`-capped result, won't catch the offset-date bug that zeroed the health score, won't spot templated `NextStep` fields. **This raises the bar on tool quality and transparency** — the custom health tool must expose its sub-scores and be date-correct, precisely because the business user can't audit it by hand.
+
+4. **The web + hosted-MCP model is actually the *better-governed* one for this audience.** A CLI session inherits whatever broad access the workstation was configured with. A business user on web connecting an **admin-approved, OAuth-scoped, Salesforce-hosted MCP server** gets access that IT controls centrally, with sharing rules enforced server-side. For scaled, non-technical rollouts, **hosted MCP is more secure and more manageable than handing people a CLI.**
+
+### Deployment nuances to flag for the workshop
+- **Not every MCP tool works on every surface.** Some servers require interactive/browser auth and may not run in headless or automated contexts — fine for an interactive web user, a caveat for background jobs.
+- **Admin gating is a feature, not a bug.** On web, connecting a server is an approve-and-configure step, not a `pip install` — this is what makes it safe for non-technical users, but it means **IT/admin enablement is the real prerequisite**, replacing the "workstation setup cost" from the dev scenario.
+- **Charts/PDF still come from the model's harness**, whose artifact capabilities vary by surface — set expectations accordingly (the MCP server never draws the chart).
+
+### Bottom line
+On a developer's Claude Code workstation, the story is *"MCP makes Claude a faster analyst."* For the **business user on Claude web — the real target audience — the story is stronger: without MCP there is no live-data workflow at all, and without a custom MCP server there is no way for a non-technical user to execute the org's own logic safely.** MCP is what makes Claude usable by the people who most need it and can least script around its absence — provided the tools are governed, transparent, and correct, because those users can't check the work by hand.

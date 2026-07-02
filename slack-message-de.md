@@ -26,7 +26,13 @@ Hey Team :wave: — ich habe denselben 15-Prompt-Sales-Workflow gegen eine echte
 • *Standard-MCP* → der Alltags-Default für NL-gestützte Analyse (sobald Auth steht). Erfindet aber keine Definitionen und zeichnet keine Charts.
 • *Custom-MCP* → bauen für org-spezifische Logik, die *konsistent* sein soll (Scoring, Eligibility, Health, Pricing) und für wiederkehrende strukturierte Aktionen. Zuerst die wertvollste „rechnet jeder anders aus“-Kennzahl und den häufigsten strukturierten Write kapseln.
 
-:bulb: *Merksatz:* Standard-MCP macht Claude zum schnelleren Analysten. Ein Custom-MCP lässt Claude mit der Urteilskraft unserer Organisation handeln.
+*Realitätscheck für Business-User (wichtig):* Der „Default-Tools“-Baseline aus Iteration 1 funktionierte nur, weil sie auf einer *Entwickler-Workstation* mit `sf` CLI, Bash, Python usw. lief. Ein echter *Business-User* (Sales Manager, RevOps, Sales Lead) hat aber einen *Web-Chat + verbindbare MCP-Server* — kein Terminal, keine CLI, kein Scripting. Das ändert alles:
+• Für sie ist Standard-MCP kein Reibungs-*Reduzierer*, sondern der *Einstieg* — der Vergleich lautet „MCP vs. nichts / manuelle CSV-Exporte“, nicht „MCP vs. handgeschriebenes SOQL“.
+• Custom-MCP wird vom „netten Unterscheidungsmerkmal“ zur *einzigen Möglichkeit, überhaupt zu handeln* — Apex von Hand verdrahten oder einen Task-Record manuell bauen ist für Nicht-Techniker schlicht unmöglich.
+• Da sie das Tool *nicht* gegenprüfen können (den Datums-Bug würden sie nie bemerken), zählen Tool-Qualität & Transparenz umso mehr: Custom-Tools müssen datumskorrekt sein und ihre Teil-Scores offenlegen.
+• Web + admin-freigegebene, OAuth-gescopte gehostete MCP-Server sind zudem das *besser governte* Modell im Scale als jedem eine CLI in die Hand zu geben. Die Voraussetzung verschiebt sich von „Workstation-Setup“ zu „IT-/Admin-Freigabe“.
+
+:bulb: *Merksatz:* Standard-MCP macht Claude zum schnelleren Analysten. Ein Custom-MCP lässt Claude mit der Urteilskraft unserer Organisation handeln. Und für nicht-technische Business-User im Web ist MCP nicht die Optimierung — *sondern das, was den Workflow überhaupt erst möglich macht.*
 
 *Kontext/Caveats:* Läuft auf synthetischen Demo-Daten (Security-Vendor, US-West) – der *Ansatz-Vergleich* ist die Botschaft, nicht die konkreten Zahlen. Beide Schreibvorgänge waren user-bestätigt.
 

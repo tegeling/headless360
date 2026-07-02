@@ -26,7 +26,13 @@ Hey team :wave: — I ran the same 15-prompt sales workflow against a live Sales
 • *Standard MCP* → the day-to-day default for NL-driven analysis (once auth is set up). Won't invent definitions or draw charts, though.
 • *Custom MCP* → build it for org-specific logic that should be *consistent* (scoring, eligibility, health, pricing) and for repeatable structured actions. Wrap your highest-value "everyone computes this differently" metric and your most common structured write first.
 
-:bulb: *Rule of thumb:* Standard MCP makes Claude a faster analyst. A custom MCP makes Claude act with our organization's judgment.
+*Reality check for business users (important):* Iteration 1's "default tools" baseline only worked because it ran on a *developer workstation* with the `sf` CLI, Bash, Python, etc. A real *business user* (sales manager, RevOps, sales leader) has a *web chat + connectable MCP servers* — no terminal, no CLI, no scripting. That reframes everything:
+• For them, standard MCP isn't a friction *reducer*, it's the *on-ramp* — the comparison is "MCP vs. nothing / manual CSV exports," not "MCP vs. hand-written SOQL."
+• Custom MCP goes from "nice differentiator" to "the *only* way they can act" — hand-wiring Apex or building a Task record by hand is simply impossible for a non-technical user.
+• Because they *can't* sanity-check the tool (they'd never spot the offset-date bug), tool quality & transparency matter even more: custom tools must be date-correct and show their sub-scores.
+• Web + admin-approved, OAuth-scoped hosted MCP is also the *better-governed* model at scale than handing everyone a CLI. Prerequisite shifts from "workstation setup" to "IT/admin enablement."
+
+:bulb: *Rule of thumb:* Standard MCP makes Claude a faster analyst. A custom MCP makes Claude act with our organization's judgment. And for non-technical business users on the web, MCP isn't the optimization — *it's what makes the workflow possible at all.*
 
 *Context/caveats:* Runs on synthetic demo data (a security vendor, US West) — the *approach comparison* is the message, not the specific numbers. Both write actions were user-confirmed.
 
