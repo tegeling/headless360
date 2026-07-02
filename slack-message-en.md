@@ -23,7 +23,7 @@ Hey team :wave: — I ran the same 15-prompt sales workflow against a live Sales
 
 *Recommendation / when to use what:*
 • *Default tools* → ad-hoc exploration, full transparency, debugging the data itself
-• *Standard MCP* → the day-to-day default for NL-driven analysis (once auth is set up). Won't invent definitions or draw charts, though.
+• *Standard MCP* → the day-to-day default for analysis you drive by asking in plain language (once auth is set up). Won't invent definitions or draw charts, though.
 • *Custom MCP* → build it for org-specific logic that should be *consistent* (scoring, eligibility, health, pricing) and for repeatable structured actions. Wrap your highest-value "everyone computes this differently" metric and your most common structured write first.
 
 *Reality check for business users (important):* Iteration 1's "default tools" baseline only worked because it ran on a *developer workstation* with the `sf` CLI, Bash, Python, etc. A real *business user* (sales manager, RevOps, sales leader) has a *web chat + connectable MCP servers* — no terminal, no CLI, no scripting. That reframes everything:

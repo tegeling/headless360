@@ -374,7 +374,7 @@ _PDF artifact: [`workshop-assets/sales-leader-summary.pdf`](workshop-assets/sale
 **13 prompts executed with default Claude tools (sf CLI + SOQL + Python/matplotlib; no MCP).**
 
 Recurring themes across the run (for the eventual comparison):
-1. **Every answer required hand-written SOQL** and, for anything analytical, custom Python to aggregate/score/join — there is no semantic or NL query layer.
+1. **Every answer required hand-written SOQL** and, for anything analytical, custom Python to aggregate/score/join — there is no plain-language query layer (you can't just ask in natural language).
 2. **Interpretation was always mine** — "relevant," "at-risk," "underworked," "strong engagement," "sales priority" all needed definitions I invented; the tools return rows, not judgment.
 3. **Offset/synthetic demo dates** repeatedly broke naive assumptions (Prompt 6's empty 90-day filter; Prompt 12's single-date response field). Answering well required *detecting* the data was seeded — a real accuracy risk for a naive agent.
 4. **Data-quality traps** surfaced only by pulling records (templated NextStep, 0/336 conversions, the Juniper Hill contradictions, LIMIT-30 masquerading as "full org").
@@ -406,7 +406,7 @@ Interpretation: commercially healthy/expanding customer (perfect opp score); 2 r
 - Steps: 2 Bash calls (lookup + Apex run).
 - Data source: live account + this org's custom Apex scoring logic invoked directly via anonymous Apex.
 - Correct / complete: Reproduced the exact custom score by calling the real Apex classes — the scores are authoritative (same code the flow/custom-MCP would run). Correctly flagged the Activity component as skewed by the offset-date issue.
-- **Key friction for the 3-way comparison:** to get the *custom* health score with default tools, I had to (a) know the scoring classes exist and their API, (b) hand-write anonymous Apex wiring up 3 Request/Response invocations, (c) parse debug logs. There is no NL affordance — this is exactly the gap a **custom MCP server** (exposing "check account health" as a tool) would close. Also, the offset-date artifact is baked into the Apex itself (`Date.today()`), so even the custom server would return Activity=0 unless the demo clock is aligned — worth verifying in Iteration 3.
+- **Key friction for the 3-way comparison:** to get the *custom* health score with default tools, I had to (a) know the scoring classes exist and their API, (b) hand-write anonymous Apex wiring up 3 Request/Response invocations, (c) parse debug logs. There is no plain-language way to ask for it — this is exactly the gap a **custom MCP server** (exposing "check account health" as a tool) would close. Also, the offset-date artifact is baked into the Apex itself (`Date.today()`), so even the custom server would return Activity=0 unless the demo clock is aligned — worth verifying in Iteration 3.
 
 ### Prompt 14b (Iteration 1 — default tools, WITHOUT repo Apex classes)
 
@@ -567,7 +567,7 @@ This is the "why a custom server" story, and it's the strongest part of the comp
 
 **Reach for default tools (sf CLI + SOQL) when:** you're doing ad-hoc, one-off exploration; you need full transparency and control over every query; you're debugging data quality itself; or no MCP server is set up and the task is quick. Cost: you write all the SOQL and invent all the analysis.
 
-**Reach for the standard MCP server when:** you want the same analytical power with far less plumbing — repeated schema/relationship/aggregate work, multi-object joins, or anything you'd otherwise hand-assemble in Python. It's the **default for day-to-day NL-driven analysis** once auth is set up. It won't invent business definitions for you, and it won't draw charts by itself.
+**Reach for the standard MCP server when:** you want the same analytical power with far less manual work — repeated schema/relationship/aggregate work, multi-object joins, or anything you'd otherwise hand-assemble in Python. It's the **default for day-to-day analysis you drive by asking in plain language** once auth is set up. It won't invent business definitions for you, and it won't draw charts by itself.
 
 **Invest in a custom MCP server when:** a task has (a) **org-specific business logic** that should be consistent across users (scoring, eligibility, health, pricing), (b) **a repeatable action** with embedded rules (create X the way we always create X), or (c) a workflow you don't want every analyst re-deriving. The payoff is one-call, governed, standardized outcomes. **What to wrap first:** your highest-value "everyone computes this slightly differently" metric (here: Account Health) and your most common structured write (here: the sync-meeting task). **Guardrails to build in:** make the logic date-aware/parameterized (the offset bug), and return enough detail (component sub-scores, chosen contact, referenced cases) that the black box stays auditable.
 

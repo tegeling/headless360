@@ -38,7 +38,7 @@ That reframes the whole comparison for the real target audience:
 ## Recommendation
 
 - **Default tools** → ad-hoc exploration, full transparency, debugging the data itself.
-- **Standard MCP** → the day-to-day default for NL-driven analysis once auth is set up. Won't invent definitions or draw charts for you.
+- **Standard MCP** → the day-to-day default for analysis you drive by asking in plain language, once auth is set up. Won't invent definitions or draw charts for you.
 - **Custom MCP** → build it for **org-specific logic that should be consistent** (scoring, eligibility, health, pricing) and **repeatable structured actions**. Wrap your highest-value "everyone computes this differently" metric and your most common structured write first.
 
 > **Rule of thumb:** *Standard MCP makes Claude a faster analyst. A custom MCP makes Claude act with your organization's judgment.*

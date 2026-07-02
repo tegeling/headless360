@@ -23,7 +23,7 @@ Hey Team :wave: — ich habe denselben 15-Prompt-Sales-Workflow gegen eine echte
 
 *Empfehlung / Wann was:*
 • *Default Tools* → Ad-hoc-Exploration, volle Transparenz, Debugging der Daten selbst
-• *Standard-MCP* → der Alltags-Default für NL-gestützte Analyse (sobald Auth steht). Erfindet aber keine Definitionen und zeichnet keine Charts.
+• *Standard-MCP* → der Alltags-Default für Analysen, die man in normaler Sprache steuert (sobald Auth steht). Erfindet aber keine Definitionen und zeichnet keine Charts.
 • *Custom-MCP* → bauen für org-spezifische Logik, die *konsistent* sein soll (Scoring, Eligibility, Health, Pricing) und für wiederkehrende strukturierte Aktionen. Zuerst die wertvollste „rechnet jeder anders aus“-Kennzahl und den häufigsten strukturierten Write kapseln.
 
 *Realitätscheck für Business-User (wichtig):* Der „Default-Tools“-Baseline aus Iteration 1 funktionierte nur, weil sie auf einer *Entwickler-Workstation* mit `sf` CLI, Bash, Python usw. lief. Ein echter *Business-User* (Sales Manager, RevOps, Sales Lead) hat aber einen *Web-Chat + verbindbare MCP-Server* — kein Terminal, keine CLI, kein Scripting. Das ändert alles:
