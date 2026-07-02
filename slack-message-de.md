@@ -8,11 +8,11 @@ _Zum Kopieren in Slack. Emojis/Formatierung sind Slack-tauglich._
 
 Hey Team :wave: — ich habe denselben 15-Prompt-Sales-Workflow gegen eine echte Salesforce-Org auf *drei* Arten laufen lassen und die Ansätze verglichen. Kurzfazit:
 
-*TL;DR:* Für Analyse liefert ein *Standard-Salesforce-MCP-Server* dieselben Antworten wie die Default-Tools – aber mit deutlich weniger Reibung (Claude als schnellerer Analyst). Der echte Sprung ist ein *Custom-MCP-Server*: Er macht org-spezifische Logik („Account-Health prüfen“, „Sync-Meeting anlegen“) zu *einem einzigen, governten Tool-Call* (Claude als Operator).
+*TL;DR:* Für Analyse liefert ein *Standard-Salesforce-MCP-Server* dieselben Antworten wie die Default-Tools – aber mit deutlich weniger manuellem Aufwand (Claude als schnellerer Analyst). Der echte Sprung ist ein *Custom-MCP-Server*: Er macht org-spezifische Logik („Account-Health prüfen“, „Sync-Meeting anlegen“) zu *einem einzigen, governten Tool-Call* (Claude als Operator).
 
 *Die drei Ansätze:*
 • *Default Tools* – Claude steuert die `sf` CLI (SOQL, Apex) über Bash → maximale Kontrolle, maximale Handarbeit
-• *Standard-MCP* – von Salesforce gehosteter Server (Schema, SOQL, Aggregationen) → gleiche Analyse, viel weniger Reibung
+• *Standard-MCP* – von Salesforce gehosteter Server (Schema, SOQL, Aggregationen) → gleiche Analyse, viel weniger manueller Aufwand
 • *Custom-MCP* – selbst gebauter Server um unsere eigene Apex-Logik (Account Health, Sync Meeting) → die Urteilskraft unserer Organisation, nur einen Call entfernt
 
 *Was rauskam:*
@@ -27,7 +27,7 @@ Hey Team :wave: — ich habe denselben 15-Prompt-Sales-Workflow gegen eine echte
 • *Custom-MCP* → bauen für org-spezifische Logik, die *konsistent* sein soll (Scoring, Eligibility, Health, Pricing) und für wiederkehrende strukturierte Aktionen. Zuerst die wertvollste „rechnet jeder anders aus“-Kennzahl und den häufigsten strukturierten Write kapseln.
 
 *Realitätscheck für Business-User (wichtig):* Der „Default-Tools“-Baseline aus Iteration 1 funktionierte nur, weil sie auf einer *Entwickler-Workstation* mit `sf` CLI, Bash, Python usw. lief. Ein echter *Business-User* (Sales Manager, RevOps, Sales Lead) hat aber einen *Web-Chat + verbindbare MCP-Server* — kein Terminal, keine CLI, kein Scripting. Das ändert alles:
-• Für sie ist Standard-MCP kein Reibungs-*Reduzierer*, sondern der *Einstieg* — der Vergleich lautet „MCP vs. nichts / manuelle CSV-Exporte“, nicht „MCP vs. handgeschriebenes SOQL“.
+• Für sie spart Standard-MCP nicht nur *Schritte*, sondern ist der *Einstieg überhaupt* — der Vergleich lautet „MCP vs. nichts / manuelle CSV-Exporte“, nicht „MCP vs. handgeschriebenes SOQL“.
 • Custom-MCP wird vom „netten Unterscheidungsmerkmal“ zur *einzigen Möglichkeit, überhaupt zu handeln* — Apex von Hand verdrahten oder einen Task-Record manuell bauen ist für Nicht-Techniker schlicht unmöglich.
 • Da sie das Tool *nicht* gegenprüfen können (den Datums-Bug würden sie nie bemerken), zählen Tool-Qualität & Transparenz umso mehr: Custom-Tools müssen datumskorrekt sein und ihre Teil-Scores offenlegen.
 • Web + admin-freigegebene, OAuth-gescopte gehostete MCP-Server sind zudem das *besser governte* Modell im Scale als jedem eine CLI in die Hand zu geben. Die Voraussetzung verschiebt sich von „Workstation-Setup“ zu „IT-/Admin-Freigabe“.

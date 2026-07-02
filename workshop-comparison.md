@@ -502,7 +502,7 @@ _To be filled in. Prompts 14–15 are additionally run against a custom MCP serv
 
 ### 1. Executive summary
 
-For **read/analysis prompts (1–13), standard MCP and default tools reach essentially the same answers** — both need Claude to supply all the *interpretation* ("at-risk," "underworked," "buyer") — but **standard MCP gets there with markedly less friction**: server-side SOQL + `GROUP BY` aggregation and one-call relationship queries replace Iteration 1's hand-written SOQL, JSON-shape gotchas, `/tmp` ID-plumbing, and inline-Python assembly. The **single biggest differentiator is the custom MCP server (Prompts 14–15)**: it collapses work that took Iteration 1 either deep Apex knowledge (hand-wired anonymous Apex) or a from-scratch rubric into **one governed tool call** that returns the org's *own* definition of "account health" and its *own* "sync meeting" action. The trade-off to teach: that convenience is **opaque and can hide data-quality problems** — the custom health tool faithfully reproduced the Apex's date-blind `Activity 0/30` (scoring the account 56.67/100) even though raw data shows the account was actively engaged, a trap Iteration 1's raw-data baseline (14b) actually caught.
+For **read/analysis prompts (1–13), standard MCP and default tools reach essentially the same answers** — both need Claude to supply all the *interpretation* ("at-risk," "underworked," "buyer") — but **standard MCP gets there with far fewer steps and workarounds**: the server handled the querying, grouping, and joining of data that Iteration 1 had to build by hand (hand-written queries, data-format errors that caused retries, passing record IDs between steps, and extra scripting to combine results). The **single biggest differentiator is the custom MCP server (Prompts 14–15)**: it collapses work that took Iteration 1 either deep Apex knowledge (hand-wired anonymous Apex) or a from-scratch rubric into **one governed tool call** that returns the org's *own* definition of "account health" and its *own* "sync meeting" action. The trade-off to teach: that convenience is **opaque and can hide data-quality problems** — the custom health tool faithfully reproduced the Apex's date-blind `Activity 0/30` (scoring the account 56.67/100) even though raw data shows the account was actively engaged, a trap Iteration 1's raw-data baseline (14b) actually caught.
 
 ### 2. Per-prompt scorecard
 
@@ -541,7 +541,7 @@ For **read/analysis prompts (1–13), standard MCP and default tools reach essen
 ### 4. Standard MCP vs. default tools — key findings
 
 **Where standard MCP clearly helped:**
-- **Less mechanical friction.** Iteration 1's recurring tax — hand-written SOQL, `/tmp` ID-plumbing between queries, inline-Python aggregation/scoring, and JSON-shape gotchas (nested `Campaign.Name`, invalid `Contact.Name` relationship paths) that cost several retries — **largely disappeared.** `getObjectSchema` returned relevance-shaped, picklist-annotated field lists; `soqlQuery` with `GROUP BY` did distribution counting server-side; relationship subqueries returned parent+children in one call.
+- **Much less manual work.** Iteration 1's recurring overhead — hand-written queries, passing record IDs between separate queries, extra scripting to aggregate/score results, and data-format errors (nested and invalid field paths) that cost several retries — **largely disappeared.** The schema tool returned ready-to-use field lists; queries with `GROUP BY` did the counting on the server; and relationship queries returned an account and its child records in one call.
 - **Avoided the LIMIT-30 accuracy error.** Iteration 1's Prompt 3 mistook `LIMIT 30` for the full org and had to self-correct two prompts later. Iteration 2 used `GROUP BY` and saw all **152 accounts** immediately — a cleaner, more accurate first answer.
 - **Schema tool is genuinely better than raw describe.** One `getObjectSchema` call answered both Prompt 1 and Prompt 2; it's built for LLM consumption (labels + types + picklists), not the verbose `sf sobject describe` dump Iteration 1 had to filter.
 
@@ -549,9 +549,9 @@ For **read/analysis prompts (1–13), standard MCP and default tools reach essen
 - **Interpretation is still 100% Claude's job.** "At-risk," "underworked," "strong engagement," "buyer," "sales priority" — the MCP returns rows, not judgment. Every definition was invented in-agent, exactly as in Iteration 1. Standard MCP is a *better data pipe*, not an analyst.
 - **Same data-quality traps still require vigilance.** Seeded/uniform campaign data, the single-date `FirstRespondedDate`, templated `NextStep`, unpopulated hygiene fields (`HasOverdueTask`/`PushCount`/`LastStageChangeDate`) — all still had to be *detected*. (Iteration 1 arguably probed the offset-date "present" more aggressively, anchoring to Dec-15; Iteration 2 reasoned against the real system date. Neither was wrong, but it shows the trap doesn't go away.)
 - **No native visualization.** The prompts asking for charts/PDF (10–13) were served by Claude's matplotlib in *both* iterations. The standard MCP server does not emit charts — a common misconception worth correcting for the workshop audience.
-- **New friction of its own:** OAuth setup per server + occasional timeouts (one on Prompt 10) + a 132 KB schema response that truncated and needed a follow-up.
+- **New overhead of its own:** OAuth setup per server + occasional timeouts (one on Prompt 10) + a 132 KB schema response that was too large in one call and needed a follow-up.
 
-**Net:** for read/analysis work, **standard MCP is a friction-and-accuracy upgrade over default tools, not a capability leap.** Same answers, fewer footguns, less plumbing.
+**Net:** for read/analysis work, **standard MCP is an ease-of-use and accuracy upgrade over default tools, not a capability leap.** Same answers, fewer mistakes, less manual assembly.
 
 ### 5. Custom MCP server — the differentiator (Prompts 14–15)
 
@@ -603,7 +603,7 @@ _For the hands-on storybook. This is the human story the 15 prompts tell — use
 
 **The dramatic tension the data reveals.** Independently, both iterations surfaced the same story: **the pipeline looks busy, but it's leaking at the seams.** There's real money in play ($24.98M), but **~$4M sits in late-stage deals with zero logged activity**, **~half of hot/warm leads are never worked**, and **every campaign leaks responders sales never called** — while the *partner channel* is the one motion being worked reliably. It's a classic **"marketing generates, sales doesn't follow through, and the forecast is quietly inflated"** narrative — exactly the kind of thing a leader wants an AI copilot to surface fast.
 
-**Why this arc is the right teaching vehicle.** The first 13 prompts show Claude as an **analyst** — and let you contrast *default tools vs. standard MCP* (same insight, less friction). The last 2 prompts show Claude as an **operator** — and reveal *why a custom MCP server matters*: turning "check this account's health" and "set up the meeting" into one governed call using the company's **own** logic. The story climaxes exactly where the custom server earns its keep: **the moment insight becomes action.**
+**Why this arc is the right teaching vehicle.** The first 13 prompts show Claude as an **analyst** — and let you contrast *default tools vs. standard MCP* (same insight, less manual work). The last 2 prompts show Claude as an **operator** — and reveal *why a custom MCP server matters*: turning "check this account's health" and "set up the meeting" into one governed call using the company's **own** logic. The story climaxes exactly where the custom server earns its keep: **the moment insight becomes action.**
 
 ---
 
@@ -627,7 +627,7 @@ _Requested explicitly — a standalone case for MCP, distilled from the run for 
 
 **One-line takeaways for the deck:**
 - *Default tools:* maximum control, maximum manual work.
-- *Standard MCP:* same analysis, far less friction — Claude as a faster analyst.
+- *Standard MCP:* same analysis, much less manual work — Claude as a faster analyst.
 - *Custom MCP:* your organization's judgment, one call away — Claude as an operator. **Build it for the metrics and actions everyone re-derives today.**
 
 ---
@@ -645,7 +645,7 @@ _This reframes the whole comparison for the audience that actually matters most 
 | | Developer on Claude Code (Iteration 1 premise) | **Business user on Claude web (real world)** |
 |---|---|---|
 | Live org data without MCP | Yes — via `sf` CLI/SOQL | **No** — no CLI, no query tool at all |
-| Hand-write SOQL / debug JSON | Possible (it's the friction we measured) | **Not realistically** — not their skill or their surface |
+| Hand-write SOQL / debug data formats | Possible (it's the manual work we measured) | **Not realistically** — not their skill or their surface |
 | Anonymous Apex (Iter-1 Prompt 14) | Possible (hand-wired the scoring classes) | **Impossible** |
 | Build a Task record field-by-field (Prompt 15) | Possible via `data create` | **Impossible** without a tool |
 | Charts / PDF | Yes — but needed `pip install` + scripting | Depends on the web surface's own artifact features (still the *harness*, not MCP) |
@@ -653,7 +653,7 @@ _This reframes the whole comparison for the audience that actually matters most 
 
 ### The reframed conclusion for business users
 
-1. **For a business user, standard MCP isn't a "friction reducer" — it's the on-ramp.** On a dev workstation, MCP *saved steps* over the CLI. On the web, there is no CLI to save steps over: **MCP is the only practical way to reach live Salesforce data at all.** The comparison shifts from "MCP vs. CLI" to "**MCP vs. nothing / manual exports**."
+1. **For a business user, standard MCP doesn't just save steps — it's the way in.** On a dev workstation, MCP *saved steps* over the CLI. On the web, there is no CLI to save steps over: **MCP is the only practical way to reach live Salesforce data at all.** The comparison shifts from "MCP vs. CLI" to "**MCP vs. nothing / manual exports**."
 
 2. **Custom MCP goes from "nice differentiator" to "the only way they can act."** Iteration 1 reached the account-health score by *hand-wiring anonymous Apex* and created the sync-meeting by *hand-building a Task* — both flatly impossible for a non-technical user. The custom server turns those into a sentence: *"check this account's health," "set up the sync meeting."* For this audience the custom tool isn't a shortcut past SOQL — it's the **difference between "can do it" and "cannot do it at all."**
 
