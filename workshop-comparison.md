@@ -374,3 +374,49 @@ _This reframes the whole comparison for the audience that actually matters most 
 
 ### Bottom line
 On a developer's Claude Code workstation, the story is *"MCP makes Claude a faster analyst."* For the **business user on Claude web — the real target audience — the story is stronger: without MCP there is no live-data workflow at all, and without a custom MCP server there is no way for a non-technical user to execute the org's own logic safely.** MCP is what makes Claude usable by the people who most need it and can least script around its absence — provided the tools are governed, transparent, and correct, because those users can't check the work by hand.
+
+---
+
+## 11. Anticipated objections & responses (workshop prep)
+
+_Likely pushback from a technical or skeptical audience, with honest responses. The pattern that works: **concede the real part, locate the concern correctly, then connect it back to the recommendation.** Don't over-claim — several of these rest on a single un-benchmarked run._
+
+### Objection 1 — "MCP floods the context window; code-use (sf/bash/Python) keeps big data out of the LLM"
+
+**The objection (steel-manned):** A code-capable agent runs `sf data query > result.json`, previews a few rows, and processes the file with Python — so large result sets never enter the context window, and the *processing* is deterministic code, not the LLM reading tokens. A naive MCP client instead injects the entire tool result into context ("context pollution") and "processes" it by having the LLM read it. This is a real, documented concern (it's why Anthropic has published guidance on code execution with MCP).
+
+**Response (three layers):**
+1. **Concede the real part.** Dumping large tool results into context *is* a genuine problem worth designing against. Not FUD.
+2. **Locate it correctly — it's a property of the *client/harness*, not of MCP.** A code-capable client truncates + offloads + processes large results with code — whether they came from the CLI *or* an MCP tool. A minimal client would pollute context by blindly injecting a full result — but equally from a full `sf` CLI stdout. **Both our iterations ran in Claude Code, which truncated large results to a ~2 KB preview, wrote the full payload to a file, and let me process it with Python/grep — including the MCP results.** So the harness converged the two approaches; our run does *not* isolate this effect (an honest confound to state openly).
+3. **Push-down usually makes the result small anyway.** Well-formed SOQL sends aggregation to Salesforce (`GROUP BY`, `COUNT`, `SUM`, `LIMIT`, selective fields), so most results come back tiny regardless of transport — in our run, 152 accounts became ~11 rows *in Salesforce*, not in context. That's the reason the MCP path used fewer calls and a smaller window overall here.
+
+**Turn it into the point:** The strongest antidote to context pollution is a **custom MCP server that returns a computed *summary*, not raw rows** — exactly like the Account Health tool returning one score + a breakdown instead of hundreds of activity/opportunity/case records. The heavy data never touches the context window at all. **So this objection is actually an argument *for* custom, summary-returning MCP tools — not against MCP.**
+
+**Honest caveats to keep credibility:**
+- Not every MCP result in our run was small: several `soqlQuery` calls returned large blobs (P5 ~90 KB, P6 ~120 KB, P7 ~248 KB, P1 schema 132 KB and truncated). Those are exactly the "big query result" cases the objection warns about — handled cleanly here *only because* the harness offloaded them to files.
+- Neither MCP nor CLI "intelligently filters" on its own; both depend on the model writing a good query. The difference is what the client does with the *result*, not smart filtering.
+- **Where the objection bites hardest: the business-user-on-web persona.** If that client lacks code execution (no Python, no file offload), a large raw-data tool result *does* pollute context. That's a further reason to invest in tools that return summaries rather than rows — and to prefer aggregate/paged queries.
+
+### Objection 2 — "This isn't a fair or empirical benchmark"
+
+**Response:** Correct, and we say so throughout. Iteration 2 was run blind (good — independent), but the two runs used different-but-defensible definitions (e.g. "underworked" 94 vs. 166), both ran in the same code-capable harness (confounds the context question above), the data is synthetic/offset, and it's a single pass, not a repeated trial. **Frame the deliverable as a *qualitative capability comparison and teaching tool*, not a benchmark.** The robust conclusions are structural (who can use it, one call vs. many, standardized vs. invented definitions), not numeric.
+
+### Objection 3 — "MCP is another dependency/attack surface — why not just use the API or CLI we already have?"
+
+**Response:** For a *developer* who already has the CLI authenticated, the marginal win is convenience, not capability (that's literally our Iteration 1 vs. 2 finding). The case for MCP isn't "developers should drop the CLI" — it's **(a) the non-technical business user who has no CLI at all, and (b) governance**: an admin-approved, OAuth-scoped, hosted MCP server enforces sharing rules server-side and is centrally managed, versus distributing CLI access and long-lived org credentials to end users. MCP is the *more* controlled option for scaled, non-developer rollouts, not an extra liability.
+
+### Objection 4 — "The custom health score was wrong (Activity 0/30) — so custom tools are risky"
+
+**Response:** Agreed, and this is the most important teaching point, not a weakness to hide. The tool faithfully executed the org's Apex, which uses `Date.today()` against future-dated demo data — the tool was *consistent*, just built on date-blind logic. The lesson is **a custom tool is only as correct as the logic inside it**, so build them to be date-aware/parameterized and to **expose their sub-scores** (ours did — the 0/30 was visible), precisely because business users can't audit the black box by hand. This raises the bar on tool quality; it doesn't argue against custom tools.
+
+### Objection 5 — "The LLM still invents the definitions ('at-risk', 'underworked') — can we trust that?"
+
+**Response:** Yes — and that's true of *every* approach here (CLI, standard MCP, and a human analyst writing SOQL all impose a definition). The point is to make the definition **explicit and reviewable**, which the agent did each time ("underworked = Hot/Warm + no activity + not yet qualified"). Where an organization wants a *fixed, governed* definition, that's the argument for encoding it in a **custom MCP tool** (or an Apex/flow the tool wraps) so it's consistent across users and runs — again pointing at custom servers.
+
+### Objection 6 — "Standard MCP gave the same answers — so it added little value"
+
+**Response:** True for a *developer with the CLI already set up* — for reads, standard MCP is convenience, not new capability, and we say so plainly. But (a) it produced a **more accurate first answer** once (the 152-account distribution vs. the CLI's LIMIT-30 mistake), (b) it removed a class of manual errors (relationship/JSON gotchas that cost the CLI run several retries), and (c) for the **business user it's not "same answer, less effort" — it's the only way to get the answer at all.** The value depends entirely on who's asking.
+
+### Objection 7 — "Charts and the PDF came from the MCP server, right?"
+
+**Response:** No — a common misconception worth correcting proactively. Visualization/PDF generation is the **model's own tooling** (matplotlib in the harness), identical in both iterations. No MCP server in this comparison draws a chart or renders a document; the server only supplies data. Set that expectation so nobody over-attributes capabilities to MCP.

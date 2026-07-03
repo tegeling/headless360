@@ -49,7 +49,7 @@ The default-tools baseline only exists because it ran on a **pre-configured deve
 
 | File | What it is |
 |---|---|
-| **[workshop-comparison.md](workshop-comparison.md)** | The full comparison — **Part A** (per-prompt, side by side) + **Part B** (analysis, scorecard, scored dimensions, sales story, MCP benefits, business-user POV) |
+| **[workshop-comparison.md](workshop-comparison.md)** | The full comparison — **Part A** (per-prompt, side by side) + **Part B** (analysis, scorecard, scored dimensions, sales story, MCP benefits, business-user POV, and **anticipated objections & responses** for workshop prep) |
 | **[workshop-storybook.md](workshop-storybook.md)** | "The Territory Review" — the 6-act sales narrative for running the workshop live, with facilitator tips |
 | **[slack-message-en.md](slack-message-en.md)** / **[slack-message-de.md](slack-message-de.md)** | Ready-to-post internal announcements (English / German) |
 | **[Headless.md](Headless.md)** | How to connect Claude to the Salesforce-hosted MCP servers (setup/auth) |
