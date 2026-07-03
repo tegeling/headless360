@@ -5,6 +5,12 @@
 - **Iteration A — Installed MCP servers.** Branch `metadata-iteration-mcp`. Use the **Salesforce DX MCP** server (and the org's other MCP servers) as the *only* Salesforce tooling. The DX MCP has **no per-type "generate" tools**, so you author the metadata source yourself (Edit/Write) and use MCP tools for **deploy / retrieve / code-analysis / SOQL / permission-set assignment**. Do **not** install or use sf-skills on this branch.
 - **Iteration B — sf-skills.** Branch `metadata-iteration-skills`. Use the skills installed from [`forcedotcom/sf-skills`](https://github.com/forcedotcom/sf-skills) (`platform-custom-field-generate`, `platform-validation-rule-generate`, `platform-apex-generate`, `platform-apex-test-generate`, `platform-permission-set-generate`, `platform-metadata-deploy`, `platform-metadata-retrieve`, `dx-code-analyzer-run`, `platform-soql-query`). Prefer a matching skill for each step. Do **not** use the Salesforce DX MCP generate/deploy tools on this branch (SOQL/verify via skills where possible).
 
+  **Setup (run once on this branch, from the repo root):**
+  ```bash
+  npx skills add forcedotcom/sf-skills   # installs into .agents/skills/ + symlinks .claude/skills/
+  ```
+  The skills are **not vendored into git** (`.agents/`, `.claude/skills/`, `skills-lock.json` are gitignored) — reinstall to get the latest. After installing, restart the session (or run `/mcp`) so Claude Code discovers the new skills, then confirm they appear in the available-skills list before step 1.
+
 **Org:** `epic.ee57ef6782f0@orgfarm.salesforce.com` (alias `headless360`, default target org). **Steps 6–7 write metadata to this org — confirm with the user before deploying.**
 
 ---

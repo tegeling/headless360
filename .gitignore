@@ -24,6 +24,11 @@ yarn-error.log*
 # Dependency directories
 node_modules/
 
+# Agent skills installed via `npx skills add` (not vendored — reinstall to get latest)
+.agents/
+.claude/skills/
+skills-lock.json
+
 # ApexPMD cache
 .pmdCache
 
