@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "Salesforce DX": {
+      "command": "npx",
+      "args": [
+        "-y", "@salesforce/mcp",
+        "--orgs", "DEFAULT_TARGET_ORG",
+        "--toolsets", "core,orgs,metadata,data,users,lwc-experts,code-analysis,enrichment,experts-validation",
+        "--allow-non-ga-tools"
+      ]
+    }
+  }
+}
